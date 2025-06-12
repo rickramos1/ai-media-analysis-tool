@@ -1,15 +1,16 @@
-# gdelt_timeseries.py
+# newsapi_timeseries.py
 
-import csv
-from datetime import datetime, timedelta, timezone
-from collections import defaultdict
 import requests
-import gzip
-import io
+from datetime import datetime, timedelta
+import csv
+import os
+from dotenv import load_dotenv
 
-# ----------------------------
-# ✅ Define your queries here
-# ----------------------------
+# Load API key
+load_dotenv()
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+
+# Parameters
 QUERIES = {
     "abortion_misinformation": ["abortion", "infertility", "cancer"],
     "planb_sterilization": ["Plan B", "sterilization"],
@@ -18,67 +19,67 @@ QUERIES = {
     "general_misinformation": ["misinformation", "abortion"]
 }
 
-DAYS_BACK = 7  # for testing, limit to last 7 days
-BASE_URL = "http://data.gdeltproject.org/gdeltv2/"
+DOMAINS = {
+    "us_left": "msnbc.com,cnn.com,huffpost.com",
+    "us_right": "foxnews.com,breitbart.com,newsmax.com"
+}
 
-# ----------------------------
-# 🧠 Pull and analyze daily GKG files
-# ----------------------------
-def fetch_and_aggregate():
-    end_date = datetime.now(timezone.utc) - timedelta(hours=48)
-    start_date = end_date - timedelta(days=DAYS_BACK)
+START_DATE = datetime(2022, 6, 24)
+END_DATE = datetime.today()
+MAX_PAGES = 5  # Each page returns up to 100 results
 
-    results = []
-    current = start_date
+# NewsAPI Endpoint
+NEWS_API_URL = "https://newsapi.org/v2/everything"
 
-    while current <= end_date:
-        hour = current.strftime("%Y%m%d%H00")
-        url = f"{BASE_URL}gkg/{hour}.gkg.csv.zip"
-        print(f"⏳ Downloading: {url}")
+results = []
 
-        try:
-            resp = requests.get(url, timeout=10)
-            if resp.status_code != 200:
-                print(f"⚠️ Skipped {hour}: {resp.status_code}")
-                current += timedelta(hours=1)
-                continue
+for query_name, keywords in QUERIES.items():
+    for group_name, domains in DOMAINS.items():
+        q = " AND ".join(keywords)
+        print(f"🔍 {query_name} in {group_name}...")
 
-            with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8', errors='ignore') as f:
-                reader = csv.reader(f, delimiter='\t')
+        for day_offset in range((END_DATE - START_DATE).days + 1):
+            day = START_DATE + timedelta(days=day_offset)
+            from_param = day.strftime("%Y-%m-%d")
+            to_param = (day + timedelta(days=1)).strftime("%Y-%m-%d")
 
-                query_hits = defaultdict(int)
-                for row in reader:
-                    if len(row) < 4:
-                        continue
-                    doc_date = row[1][:8]
-                    themes_text = row[9] if len(row) > 9 else ""
-                    for qname, keywords in QUERIES.items():
-                        if any(kw.lower() in themes_text.lower() for kw in keywords):
-                            query_hits[(qname, doc_date)] += 1
+            total_hits = 0
 
-                for (qname, doc_date), count in query_hits.items():
-                    results.append({
-                        "date": doc_date,
-                        "query": qname,
-                        "count": count
-                    })
+            for page in range(1, MAX_PAGES + 1):
+                params = {
+                    "q": q,
+                    "from": from_param,
+                    "to": to_param,
+                    "domains": domains,
+                    "apiKey": NEWS_API_KEY,
+                    "pageSize": 100,
+                    "page": page,
+                    "language": "en",
+                    "sortBy": "relevancy"
+                }
 
-        except Exception as e:
-            print(f"❌ Error for {hour}: {e}")
+                response = requests.get(NEWS_API_URL, params=params)
+                if response.status_code != 200:
+                    print(f"❌ Error {response.status_code}: {response.text}")
+                    break
 
-        current += timedelta(hours=1)
+                data = response.json()
+                total_hits += len(data.get("articles", []))
 
-    return results
+                if len(data.get("articles", [])) < 100:
+                    break  # No more pages
 
-# ----------------------------
-# 📄 Write CSV
-# ----------------------------
-if __name__ == "__main__":
-    data = fetch_and_aggregate()
+            results.append({
+                "date": from_param,
+                "query": query_name,
+                "media_group": group_name,
+                "count": total_hits
+            })
 
-    with open("gdelt_timeseries_output.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["date", "query", "count"])
-        writer.writeheader()
-        writer.writerows(data)
+# Save to CSV
+with open("newsapi_timeseries_output.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=["date", "query", "media_group", "count"])
+    writer.writeheader()
+    writer.writerows(results)
 
-    print(f"✅ Done! {len(data)} rows written to gdelt_timeseries_output.csv")
+print(f"✅ Done! {len(results)} rows written to newsapi_timeseries_output.csv")

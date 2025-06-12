@@ -1,7 +1,7 @@
 [
-  { "id": 12, "name": "Fox News" },
-  { "id": 9219, "name": "The Daily Caller" },
-  { "id": 17591, "name": "Breitbart" },
-  { "id": 9224, "name": "Washington Times" },
-  { "id": 9241, "name": "The Blaze" }
+  { "id": 1092, "name": "Fox News" },
+  { "id": 25349, "name": "Newsmax" },
+  { "id": 19334, "name": "Breitbart" },
+  { "id": 22732, "name": "WSJ" },
+  { "id": 22088, "name": "The Blaze" }
 ]

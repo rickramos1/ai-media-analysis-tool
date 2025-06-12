@@ -1,0 +1,6 @@
+query,region,story_count,status,misleading,llm_reason
+abortion misinformation,global_mainstream,100,✅ OK,,Skipped: too short (<100 words)
+birth control myths,global_mainstream,100,✅ OK,,Skipped: too short (<100 words)
+contraceptive misinformation,global_mainstream,100,✅ OK,,Skipped: too short (<100 words)
+reproductive health funding,global_mainstream,100,✅ OK,,Skipped: too short (<100 words)
+women’s health access,global_mainstream,0,"❌ Error after 3 retries: API Server Error 403. Params: {'start': '2022-06-24', 'end': '2025-06-12', 'q': '""women\'s health"" AND access', 'platform': 'onlinenews-mediacloud', 'cs': ('34412234',), 'page_size': 100}",,Skipped: too short (<100 words)
