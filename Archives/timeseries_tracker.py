@@ -1,9 +1,13 @@
-import mediacloud.api
+from mediacloud.api import MediaCloud
+from dotenv import load_dotenv
+import os
 import csv
 from datetime import date, timedelta
 
-# --- CONFIGURATION ---
-API_KEY = 'REDACTED_MEDIACLOUD_KEY_2'
+load_dotenv()
+API_KEY = os.getenv("MEDIACLOUD_API_KEY")
+
+mc = MediaCloud(API_KEY)
 
 QUERIES = {
     "abortion_misinformation": '"abortion AND (infertility OR cancer)"',
