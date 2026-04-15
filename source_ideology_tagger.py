@@ -2,23 +2,80 @@ import csv
 import argparse
 from urllib.parse import urlparse
 
+csv.field_size_limit(2**30)
+
 # Hardcoded ideology map
 IDEOLOGY_MAP = {
+    # Right
     "foxnews.com": "Right",
     "breitbart.com": "Right",
     "dailywire.com": "Right",
-    "inquirer.com": "Center-Left",
-    "nytimes.com": "Left",
-    "cnn.com": "Left",
-    "washingtonpost.com": "Left",
-    "npr.org": "Center-Left",
-    "msnbc.com": "Left",
+    "dailysignal.com": "Right",
+    "townhall.com": "Right",
+    "dailycaller.com": "Right",
+    "nypost.com": "Right",
+    "spectator.org": "Right",
+    "pjmedia.com": "Right",
+    "redstate.com": "Right",
+    "patriotpost.us": "Right",
+    "ncregister.com": "Right",
+    # Center-Right
     "wsj.com": "Center-Right",
+    "forbes.com": "Center-Right",
+    "newsweek.com": "Center-Right",
+    # Center
     "usatoday.com": "Center",
-    "theguardian.com": "Left",
     "politico.com": "Center",
     "reuters.com": "Center",
     "apnews.com": "Center",
+    "theconversation.com": "Center",
+    "abcnews.go.com": "Center",
+    "cbsnews.com": "Center",
+    "nbcnews.com": "Center",
+    "pbs.org": "Center",
+    "benzinga.com": "Center",
+    # Center-Left
+    "inquirer.com": "Center-Left",
+    "npr.org": "Center-Left",
+    "politicalwire.com": "Center-Left",
+    "bostonglobe.com": "Center-Left",
+    "latimes.com": "Center-Left",
+    "chicagotribune.com": "Center-Left",
+    "seattletimes.com": "Center-Left",
+    "denverpost.com": "Center-Left",
+    "baltimoresun.com": "Center-Left",
+    "sandiegouniontribune.com": "Center-Left",
+    "mercurynews.com": "Center-Left",
+    "sun-sentinel.com": "Center-Left",
+    "pilotonline.com": "Center-Left",
+    "courant.com": "Center-Left",
+    "ocregister.com": "Center-Left",
+    "twincities.com": "Center-Left",
+    "orlandosentinel.com": "Center-Left",
+    "newsday.com": "Center-Left",
+    "jsonline.com": "Center-Left",
+    "cleveland.com": "Center-Left",
+    "stltoday.com": "Center-Left",
+    "newyorker.com": "Center-Left",
+    # Left
+    "nytimes.com": "Left",
+    "cnn.com": "Left",
+    "washingtonpost.com": "Left",
+    "msnbc.com": "Left",
+    "theguardian.com": "Left",
+    "rawstory.com": "Left",
+    "jezebel.com": "Left",
+    "huffpost.com": "Left",
+    "motherjones.com": "Left",
+    "dailykos.com": "Left",
+    "buzzfeed.com": "Left",
+    "slate.com": "Left",
+    "salon.com": "Left",
+    "vox.com": "Left",
+    "thenation.com": "Left",
+    "nationalmemo.com": "Left",
+    "talkingpointsmemo.com": "Left",
+    "gizmodo.com": "Left",
 }
 
 def normalize_domain(media_name):
@@ -37,14 +94,14 @@ def tag_ideology(input_file, output_file):
 
         for i, row in enumerate(reader, 2):
             if row is None or len(row) == 0:
-                print(f"⚠️ Row {i}: empty or malformed — skipping")
+                print(f"[WARN] Row {i}: empty or malformed — skipping")
                 continue
 
             media_url_raw = row.get("media_url") or row.get("media_name")
             domain = normalize_domain(media_url_raw)
             if not domain:
                 row["ideology"] = "Unknown"
-                print(f"⚠️ Row {i}: 'media_name' missing or unparseable → tagged as 'Unknown'")
+                print(f"[WARN] Row {i}: 'media_name' missing or unparseable → tagged as 'Unknown'")
                 rows.append(row)
                 continue
 
@@ -56,8 +113,8 @@ def tag_ideology(input_file, output_file):
 
             rows.append(row)
 
-    print(f"✅ Tagged {len(rows)} articles with ideology.")
-    print(f"⚠️ {len(unmatched_sources)} unmatched sources. Logged to 'unmatched_sources.txt'.")
+    print(f"[OK] Tagged {len(rows)} articles with ideology.")
+    print(f"[WARN] {len(unmatched_sources)} unmatched sources. Logged to 'unmatched_sources.txt'.")
 
     with open(output_file, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys(), quoting=csv.QUOTE_ALL)
