@@ -1,29 +1,45 @@
-import csv
 import time
-import argparse
-from newspaper import Article
+import requests
+import pandas as pd
+import re
+from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_THREADS = 5
+DEFAULT_INPUT_FILE = "womens_health_articles.csv"
+DEFAULT_OUTPUT_FILE = "womens_health_articles_text.csv"
 
+def clean_text(text):
+    text = text.replace('"', '""')  # double quotes for CSV compatibility
+    text = text.replace("\\", "\\\\")  # escape backslashes
+    text = re.sub(r"[\x00-\x1F\x7F]", " ", text)  # remove control chars
+    text = re.sub(r"\s+", " ", text).strip()  # collapse whitespace
+    return text
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 def scrape_article_text(row):
     url = row.get("url", "")
+    if not url or not url.startswith("http"):
+        row["full_text"] = ""
+        return row, url, 0
     try:
-        article = Article(url)
-        article.download()
-        article.parse()
-        text = article.text.strip()
+        response = requests.get(url, timeout=15, headers=HEADERS)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        paragraphs = soup.find_all("p")
+        text = "\n".join(p.get_text() for p in paragraphs if p.get_text().strip())
+        text = clean_text(text)
     except Exception as e:
         text = f"ERROR: {str(e)}"
-
     row["full_text"] = text
     return row, url, len(text.split())
 
-
 def scrape_all(input_file, output_file):
-    with open(input_file, encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+    df = pd.read_csv(input_file, dtype=str, keep_default_na=False)
+    rows = df.to_dict(orient="records")
 
     enriched_rows = []
     rows_to_scrape = []
@@ -40,18 +56,9 @@ def scrape_all(input_file, output_file):
         for i, future in enumerate(as_completed(future_to_row), 1):
             row, url, word_count = future.result()
             enriched_rows.append(row)
-            print(f"[{i}/{len(rows_to_scrape)}] Scraped {url[:60]}... → {word_count} words")
+            print(f"[{i}/{len(rows_to_scrape)}] Scraped {url[:60]}... -> {word_count} words")
 
-    with open(output_file, "w", newline='', encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=enriched_rows[0].keys())
-        writer.writeheader()
-        writer.writerows(enriched_rows)
-
+    pd.DataFrame(enriched_rows).to_csv(output_file, index=False, quoting=1)  # quoting=1 = QUOTE_ALL
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--infile", required=True, help="Path to CSV with article URLs")
-    parser.add_argument("--outfile", required=True, help="Path to save enriched CSV")
-    args = parser.parse_args()
-
-    scrape_all(args.infile, args.outfile)
+    scrape_all(DEFAULT_INPUT_FILE, DEFAULT_OUTPUT_FILE)
