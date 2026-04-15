@@ -1,6 +1,6 @@
 import requests
 
-GITHUB_TOKEN = "REDACTED_GITHUB_TOKEN"
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_OWNER = "rickramos1"
 REPO_NAME = "ai-media-analysis-tool"
 

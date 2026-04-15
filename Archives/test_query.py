@@ -1,7 +1,7 @@
 from mediacloud.api import SearchApi
 from datetime import date
 
-mc = SearchApi("REDACTED_MEDIACLOUD_KEY_2")
+mc = SearchApi(os.getenv("MEDIACLOUD_API_KEY"))
 
 results = mc.story_count(
     query="*",

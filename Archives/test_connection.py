@@ -2,7 +2,7 @@ from mediacloud.api import SearchApi, DirectoryApi
 from datetime import date
 
 # Replace with your actual API key or import from config
-API_KEY = "REDACTED_MEDIACLOUD_KEY_2"
+API_KEY = os.getenv("MEDIACLOUD_API_KEY")
 mc = SearchApi(API_KEY)
 
 try:
