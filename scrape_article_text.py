@@ -1,24 +1,64 @@
-import time
-import requests
-import pandas as pd
+import random
 import re
-from bs4 import BeautifulSoup
+import time
+
+import pandas as pd
+import requests
+import trafilatura
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_THREADS = 5
 DEFAULT_INPUT_FILE = "womens_health_articles.csv"
 DEFAULT_OUTPUT_FILE = "womens_health_articles_text.csv"
 
+# Rotate through realistic human-browser User-Agents, including DuckDuckGo
+# Privacy Browser on macOS/iOS/Android. Helps get past static bot-filter
+# heuristics. Does NOT defeat TLS fingerprinting or JS challenges — if WAF
+# errors persist, the next tier is curl_cffi or playwright.
+USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:131.0) Gecko/20100101 Firefox/131.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 DuckDuckGo/7 Safari/605.1.15",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1 Ddg/7",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 DuckDuckGo/5",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+]
+
+REFERERS = [
+    "https://duckduckgo.com/",
+    "https://www.google.com/",
+    "https://news.google.com/",
+    "",  # some requests without referer — also human behavior
+]
+
+
 def clean_text(text):
-    text = text.replace('"', '""')  # double quotes for CSV compatibility
-    text = text.replace("\\", "\\\\")  # escape backslashes
-    text = re.sub(r"[\x00-\x1F\x7F]", " ", text)  # remove control chars
-    text = re.sub(r"\s+", " ", text).strip()  # collapse whitespace
+    if not text:
+        return ""
+    text = re.sub(r"[\x00-\x1F\x7F]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+
+def browser_headers():
+    return {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Referer": random.choice(REFERERS),
+    }
+
 
 def scrape_article_text(row):
     url = row.get("url", "")
@@ -26,12 +66,18 @@ def scrape_article_text(row):
         row["full_text"] = ""
         return row, url, 0
     try:
-        response = requests.get(url, timeout=15, headers=HEADERS)
+        time.sleep(random.uniform(0.3, 1.5))
+        response = requests.get(url, timeout=15, headers=browser_headers())
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        paragraphs = soup.find_all("p")
-        text = "\n".join(p.get_text() for p in paragraphs if p.get_text().strip())
-        text = clean_text(text)
+        extracted = trafilatura.extract(
+            response.text,
+            url=url,
+            favor_precision=True,
+            include_comments=False,
+            include_tables=False,
+            no_fallback=False,
+        )
+        text = clean_text(extracted or "")
     except Exception as e:
         text = f"ERROR: {str(e)}"
     row["full_text"] = text

@@ -10,6 +10,23 @@ __pycache__/
 bad_rows.csv
 unmatched_sources.txt
 
+# Pipeline JSON outputs
+claims*.json
+claim_families*.json
+stage4a_candidates*.json
+stage4b_verdicts*.json
+embeddings_*.npy
+embeddings_*_manifest.json
+
+# Stage 3 reviewer artifact (regenerated per run)
+stage3_review.md
+
+# Backups created during pipeline iterations
+*.bak.*
+
+# Run logs
+*.log
+
 # IDE
 .vscode/
 .idea/

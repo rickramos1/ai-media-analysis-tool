@@ -4,7 +4,9 @@ from urllib.parse import urlparse
 
 csv.field_size_limit(2**30)
 
-# Hardcoded ideology map
+# Ideology tags follow AllSides / Ad Fontes-style buckets: Left, Center-Left,
+# Center, Center-Right, Right. These are editorial-stance judgments, not
+# factual-reliability ratings. Unknown means the outlet is not yet tagged.
 IDEOLOGY_MAP = {
     # Right
     "foxnews.com": "Right",
@@ -34,6 +36,8 @@ IDEOLOGY_MAP = {
     "nbcnews.com": "Center",
     "pbs.org": "Center",
     "benzinga.com": "Center",
+    "factcheck.org": "Center",
+    "staradvertiser.com": "Center",
     # Center-Left
     "inquirer.com": "Center-Left",
     "npr.org": "Center-Left",
@@ -57,6 +61,9 @@ IDEOLOGY_MAP = {
     "cleveland.com": "Center-Left",
     "stltoday.com": "Center-Left",
     "newyorker.com": "Center-Left",
+    "scientificamerican.com": "Center-Left",
+    "theverge.com": "Center-Left",
+    "wired.com": "Center-Left",
     # Left
     "nytimes.com": "Left",
     "cnn.com": "Left",
@@ -76,6 +83,8 @@ IDEOLOGY_MAP = {
     "nationalmemo.com": "Left",
     "talkingpointsmemo.com": "Left",
     "gizmodo.com": "Left",
+    "alternet.org": "Left",
+    "theintercept.com": "Left",
 }
 
 def normalize_domain(media_name):
