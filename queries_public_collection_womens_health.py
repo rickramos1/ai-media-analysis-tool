@@ -6,57 +6,58 @@ import csv
 import sys
 import time
 
-def run_womens_health_queries():
-    # Carrier-focused queries: use the promotional/advocacy language that misinfo
-    # carriers use, not the meta-vocabulary fact-checkers use (myth, hoax,
-    # misinformation). NOT-clauses help exclude debunkers of the same terms.
-    # See BACKLOG.md "Cross-reference misinfo detection" for context.
-    TOPIC_QUERIES = {
-        "abortion pill reversal": (
-            '("abortion pill reversal" OR "APR protocol" OR "mifepristone reversal") '
-            'AND NOT ("no evidence" OR "debunked" OR "not FDA-approved" OR "pseudoscience")'
-        ),
-        "chemical abortion harms": (
-            '"chemical abortion" AND ("hurts women" OR "endangers women" OR '
-            'complications OR "hemorrhage" OR "emergency room" OR "unsafe")'
-        ),
-        "emergency contraception abortifacient": (
-            '("Plan B" OR "emergency contraception" OR "morning-after pill" OR "ella") AND '
-            '(abortifacient OR "ends a pregnancy" OR "causes abortion" OR "prevents implantation")'
-        ),
-        "birth control harm claims": (
-            '("birth control" OR "the pill" OR "hormonal contraception") AND '
-            '("causes cancer" OR "causes depression" OR "causes infertility" OR '
-            '"ruined my" OR "hormone imbalance" OR "dangers of" OR "got off" OR "quit")'
-        ),
-        "IUD misinfo": (
-            '(IUD OR "intrauterine") AND '
-            '(abortifacient OR "causes abortion" OR "perforates" OR "trauma" OR "ruined")'
-        ),
-        "mifepristone safety attack": (
-            '(mifepristone OR "abortion pill") AND '
-            '("FDA rushed" OR "not safe" OR "adverse events" OR "REMS failed" OR '
-            '"Biden deregulated" OR "contaminates water" OR "environmental threat")'
-        ),
-        "fertility awareness superiority": (
-            '("fertility awareness" OR "natural family planning" OR "NFP" OR "cycle tracking") AND '
-            '(effective OR "just as" OR "more effective" OR alternative OR "no side effects")'
-        ),
-        "CPC promotion": (
-            '("pregnancy resource center" OR "pregnancy help center" OR "crisis pregnancy center") AND '
-            '("free ultrasound" OR ministry OR "abortion alternatives" OR "pro-life" OR "baby boxes") '
-            'AND NOT ("deceptive" OR "misleading" OR "investigation")'
-        ),
-        "trad wife anti-contraception": (
-            '("trad wife" OR "traditional wife" OR "homeschool mom") AND '
-            '("birth control" OR contraception OR "natural cycle" OR fertility)'
-        ),
-        "wellness hormone influencers": (
-            '("hormonal imbalance" OR "fix your hormones" OR "balance hormones" OR '
-            '"seed cycling") AND (natural OR detox OR "root cause" OR supplement)'
-        ),
-    }
+# Carrier-focused queries: use the promotional/advocacy language that misinfo
+# carriers use, not the meta-vocabulary fact-checkers use (myth, hoax,
+# misinformation). NOT-clauses help exclude debunkers of the same terms.
+# See BACKLOG.md "Cross-reference misinfo detection" for context.
+TOPIC_QUERIES = {
+    "abortion pill reversal": (
+        '("abortion pill reversal" OR "APR protocol" OR "mifepristone reversal") '
+        'AND NOT ("no evidence" OR "debunked" OR "not FDA-approved" OR "pseudoscience")'
+    ),
+    "chemical abortion harms": (
+        '"chemical abortion" AND ("hurts women" OR "endangers women" OR '
+        'complications OR "hemorrhage" OR "emergency room" OR "unsafe")'
+    ),
+    "emergency contraception abortifacient": (
+        '("Plan B" OR "emergency contraception" OR "morning-after pill" OR "ella") AND '
+        '(abortifacient OR "ends a pregnancy" OR "causes abortion" OR "prevents implantation")'
+    ),
+    "birth control harm claims": (
+        '("birth control" OR "the pill" OR "hormonal contraception") AND '
+        '("causes cancer" OR "causes depression" OR "causes infertility" OR '
+        '"ruined my" OR "hormone imbalance" OR "dangers of" OR "got off" OR "quit")'
+    ),
+    "IUD misinfo": (
+        '(IUD OR "intrauterine") AND '
+        '(abortifacient OR "causes abortion" OR "perforates" OR "trauma" OR "ruined")'
+    ),
+    "mifepristone safety attack": (
+        '(mifepristone OR "abortion pill") AND '
+        '("FDA rushed" OR "not safe" OR "adverse events" OR "REMS failed" OR '
+        '"Biden deregulated" OR "contaminates water" OR "environmental threat")'
+    ),
+    "fertility awareness superiority": (
+        '("fertility awareness" OR "natural family planning" OR "NFP" OR "cycle tracking") AND '
+        '(effective OR "just as" OR "more effective" OR alternative OR "no side effects")'
+    ),
+    "CPC promotion": (
+        '("pregnancy resource center" OR "pregnancy help center" OR "crisis pregnancy center") AND '
+        '("free ultrasound" OR ministry OR "abortion alternatives" OR "pro-life" OR "baby boxes") '
+        'AND NOT ("deceptive" OR "misleading" OR "investigation")'
+    ),
+    "trad wife anti-contraception": (
+        '("trad wife" OR "traditional wife" OR "homeschool mom") AND '
+        '("birth control" OR contraception OR "natural cycle" OR fertility)'
+    ),
+    "wellness hormone influencers": (
+        '("hormonal imbalance" OR "fix your hormones" OR "balance hormones" OR '
+        '"seed cycling") AND (natural OR detox OR "root cause" OR supplement)'
+    ),
+}
 
+
+def run_womens_health_queries():
     COLLECTION_IDS = [34412234]
     START_DATE = date(2022, 6, 24)  # Roe v. Wade overturned
     END_DATE = date.today()
