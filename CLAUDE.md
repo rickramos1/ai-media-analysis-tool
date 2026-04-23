@@ -27,6 +27,8 @@ source_ideology_tagger.py                       →  tagged output
 
 **Final reviewer outputs** are `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (human-readable report). Generate both with the post-processing block at the end of the most recent session — there's no script for it yet, but it's a ~50-line pandas/markdown writer.
 
+**Power BI handoff**: `misinfo_carriers_pbi.csv` (enriched with outlet ideology + publish date) and `stage4b_all_verdicts_pbi.csv` (full verdict set, used for rate measures) are the data files. `pbi_build_guide.md` walks the team through the one-time .pbix build in Power BI Desktop on Windows. After subsequent pipeline reruns, regenerated CSVs drop into the same folder and the team clicks **Refresh** in PBI — no rebuild needed.
+
 Run from the project root with the venv activated. `misinfo_detector.py` and the LLM stages support `--max-rows N` (or smoke-test patterns) — use them before a full run.
 
 The first-pass `misinfo_detector.py` pre-dates the cross-reference pipeline. It still ships shared helpers (`filter_eligible`, `format_hms`, `TOPIC_TERMS`, `CONTEXT_RX`) that the new stages import. Don't delete it without porting those helpers.

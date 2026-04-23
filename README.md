@@ -105,6 +105,9 @@ python source_ideology_tagger.py --infile womens_health_articles_text.csv --outf
 | `misinfo_carriers.csv` | 4b | final flagged carriers (one row per `carrying` verdict) |
 | `misinfo_carriers_by_article.csv` | (post) | one row per unique flagged article; multiple claims collected in `claims_carried_json` |
 | `FINDINGS.md` | (post) | human-readable summary report — methodology, top campaigns, top flagged articles, honest limits, reviewer workflow |
+| `misinfo_carriers_pbi.csv` | (post) | Power BI-ready carriers data, enriched with outlet ideology + publish date |
+| `stage4b_all_verdicts_pbi.csv` | (post) | full verdict set for PBI rate/proportion measures |
+| `pbi_build_guide.md` | (post) | step-by-step Windows-side guide for building the dashboard .pbix |
 | `keyword_trends.csv` / `keyword_trends.png` | (optional) | weekly keyword frequency |
 
 ## Project Structure
