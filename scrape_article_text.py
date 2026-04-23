@@ -79,7 +79,8 @@ def scrape_article_text(row):
         )
         text = clean_text(extracted or "")
     except Exception as e:
-        text = f"ERROR: {str(e)}"
+        print(f"[scrape] {url} -> {e}", flush=True)
+        text = ""
     row["full_text"] = text
     return row, url, len(text.split())
 
@@ -91,7 +92,8 @@ def scrape_all(input_file, output_file):
     rows_to_scrape = []
 
     for row in rows:
-        if row.get("full_text") and len(row["full_text"].strip()) > 30:
+        existing = (row.get("full_text") or "").strip()
+        if existing and len(existing) > 30 and not existing.startswith("ERROR:"):
             enriched_rows.append(row)
         else:
             rows_to_scrape.append(row)
