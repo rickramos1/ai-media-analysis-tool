@@ -18,14 +18,14 @@ stage3_filter.py             (Stage 3)          →  claims_verified.json + clai
 claim_normalizer.py          (Stage 3.5, LLM)   →  claim_families.json + claim_families_filtered.json
 stage4a_retrieval.py         (Stage 4a, embed)  →  stage4a_candidates.json + embeddings_*.npy
 stage4b_verify.py            (Stage 4b, LLM)    →  stage4b_verdicts.json + misinfo_carriers.csv
-(post-processing)                               →  misinfo_carriers_by_article.csv + FINDINGS.md
+stage5_report.py             (Stage 5)          →  misinfo_carriers_by_article.csv + FINDINGS.md
 keyword_analysis.py                             →  keyword_trends.csv, keyword_trends.png
 source_ideology_tagger.py                       →  tagged output
 ```
 
 `run_pipeline_1_to_4a.sh` orchestrates stages 1 → 4a end-to-end. Stage 4b is run separately because it's the longest LLM stage and the user wants explicit GPU windows for it.
 
-**Final reviewer outputs** are `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (human-readable report). Generate both with the post-processing block at the end of the most recent session — there's no script for it yet, but it's a ~50-line pandas/markdown writer.
+**Final reviewer outputs** are `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (human-readable report). Generate both with `stage5_report.py`. The campaigns table's `Description` column is the representative carried claim text per actor; the editorial prose that appeared in earlier runs (refutation context, policy framing) can be hand-polished after regen if desired.
 
 **Power BI handoff**: `misinfo_carriers_pbi.csv` (enriched with outlet ideology + publish date) and `stage4b_all_verdicts_pbi.csv` (full verdict set, used for rate measures) are the data files. `pbi_build_guide.md` walks the team through the one-time .pbix build in Power BI Desktop on Windows. After subsequent pipeline reruns, regenerated CSVs drop into the same folder and the team clicks **Refresh** in PBI — no rebuild needed.
 

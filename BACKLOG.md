@@ -1,69 +1,24 @@
 # Backlog
 
-Future work, not yet scoped or scheduled.
+Future work, not yet scoped or scheduled. For what's shipped, see `CLAUDE.md` (pipeline diagram) and `FINDINGS.md` (latest run output).
 
-## Cross-reference misinfo detection (next major iteration)
+## Cross-reference misinfo detection — follow-ups
 
-The initial `misinfo_detector.py` asked the LLM a bad question ("is this article misleading?") and in a 545-article run produced 377 Unknown (76%) and 6 False-positive True verdicts — all 6 were fact-check journalism *reporting on* misinformation, not carrying it. That failure mode points to a better architecture: treat fact-check articles as a signal source, not noise.
+Stages 1–5 of the original cross-reference spec are shipped (`article_classifier.py`, `claim_extractor.py`, `stage3_filter.py`, `claim_normalizer.py`, `stage4a_retrieval.py`, `stage4b_verify.py`, `stage5_report.py`). `stage5_report.py` regenerates `misinfo_carriers_by_article.csv` + `FINDINGS.md` from the Stage 4b verdicts. What's still open:
 
-### Architecture
+- **Claim extraction test set.** The 6 original True-verdict articles were called out as a natural starter set for evaluating Stage 2 prompt quality; no test set / regression harness exists yet.
+- **Stage 3.5 normalizer chunking.** `claim_normalizer.py` makes one big LLM call to cluster all claims. At ≥150 input claims with `num_ctx=8192`, qwen3 sometimes returns prose instead of JSON. Proper fix is batching ~40 claims per call and merging family clusters by fuzzy matching canonical claim texts. Stage 4a's fallback path masks the failure today.
+- **Stage 4b UNKNOWN rate.** Currently ~20% UNKNOWN on first pass, recoverable by re-running with the same `num_predict=1500`. Worth investigating whether a tighter prompt or a different stop pattern gets UNKNOWN under 5% without the re-run.
 
-```
-Stage 1 — classify each article
-  {FACT_CHECK, ORIGINAL, OTHER}
-  (LLM call, small prompt, cheap)
+## Scraper: Cloudflare-tier bypass
 
-Stage 2 — for FACT_CHECK articles, extract structured claims
-  For each debunked claim, emit:
-    - claim_text            (the specific statement being refuted)
-    - claim_source          (outlet/person that made the claim, if named)
-    - refutation            (what evidence the fact-check cites)
-    - evidence_sources      (cited studies, experts, regulators)
-    - fact_check_outlet     (the article we extracted this from)
-    - ideology_tag          (of the fact-check outlet)
-  → "debunked claims database"
-
-Stage 3 — require multiple independent debunks
-  Admit a claim to the canonical database only if ≥2 fact-check outlets
-  with different ideology tags refute it. Avoids one-outlet editorial
-  assertions becoming "ground truth".
-
-Stage 4 — for ORIGINAL articles, search for claim-carriers
-  (a) Embedding-based retrieval: embed each debunked claim and each
-      ORIGINAL article; return top-K candidate matches by cosine.
-  (b) LLM verification: "Article X says: [quote]. Debunked claim Y:
-      [claim]. Does X present Y as true?" — binary yes/no/uncertain.
-  Flag article iff verification is "yes".
-
-Stage 5 — audit trail
-  Every flagged article carries the claim IDs, the fact-check sources
-  that refuted them, and the specific passage in the article that
-  matches. Human reviewer can inspect before publication.
-```
-
-### Honest limits
-
-- Fact-checkers are not absolute ground truth. Require multi-outlet, multi-ideology debunks (Stage 3) and keep a human reviewer in the loop.
-- Embedding retrieval (Stage 4a) depends on claim-text being a good query — short or vague claims will retrieve noise. Stage 4b's LLM verification is the real gate.
-- Claim extraction (Stage 2) is the hardest prompt. Needs careful few-shot examples and a test set. The 6 current True-verdict articles are a natural starter set.
-
-### Dependencies
-
-- Stage 4a benefits from the existing "Article vectorization & topic clustering" item above — shared embedding infrastructure.
-- Stage 3 relies on `source_ideology_tagger.py` coverage. Verify all fact-check outlets in our corpus are tagged before running Stage 3.
-- Storage: claims database should be a DuckDB table (not CSV) from day one — see "Storage layer" item below. Relational joins (claims × articles × outlets × ideology) don't fit CSVs well.
-
-### Bootstrap path
-
-1. Run claim extraction (Stage 2) on the 6 existing True-verdict articles as a proof of concept. Evaluate claim quality manually.
-2. Add a Stage 1 classifier to the existing pipeline, re-run at small scale to quantify FACT_CHECK vs ORIGINAL proportions.
-3. If Stage 2 claims look usable, build the claim database table.
-4. Then tackle Stage 4 retrieval + verification.
+UA rotation + realistic headers clears static WAF heuristics. Cloudflare-tier blocks (Newsweek, Forbes, ABC News, parts of WaPo) still 403. Next tier is `curl_cffi` (TLS fingerprint matching) or `playwright` (real browser). Measure what fraction of the corpus we're losing before committing — playwright adds real operational weight.
 
 ## Article vectorization & topic clustering
 
-Embed each article (e.g. `nomic-embed-text` already on bigdoggie, or sentence-transformers locally) and cluster to surface topic groupings beyond the MediaCloud query labels. Useful for:
-- Replacing the keyword-based topic relevance gate with semantic relevance (drop off-topic articles by cosine similarity to topic centroid instead of keyword presence).
+Embed each article (`nomic-embed-text` is already on bigdoggie) and cluster to surface topic groupings beyond the MediaCloud query labels. Useful for:
+
+- Replacing the keyword-based topic relevance gate (`misinfo_detector.TOPIC_TERMS`) with semantic relevance — drop off-topic articles by cosine similarity to a topic centroid instead of keyword presence. Would also fix the silent-filter failure mode when query labels drift out of sync with `TOPIC_TERMS`.
 - Discovering emergent narratives across outlets that don't match a predefined query.
 - Deduplicating near-identical syndicated coverage before sending to the LLM.
 
@@ -73,4 +28,4 @@ Run n-gram (bi/trigram) extraction across article bodies grouped by topic, ideol
 
 ## Storage layer: DuckDB + GCP scalability
 
-Move canonical storage off CSVs onto DuckDB (single-file, columnar, SQL — drop-in for the local pipeline). Plan migration path to Google Cloud (GCS-backed Parquet, BigQuery, or DuckDB-over-GCS) for scale. Keep CSV export as a downstream artifact for compatibility.
+Move canonical storage off CSVs onto DuckDB (single-file, columnar, SQL — drop-in for the local pipeline). The claims + families + verdicts + articles graph is relational and doesn't fit CSVs well; today we round-trip through JSON and re-key on every stage. Plan migration path to GCP (GCS-backed Parquet, BigQuery, or DuckDB-over-GCS) for scale. Keep CSV export as a downstream artifact for compatibility.
