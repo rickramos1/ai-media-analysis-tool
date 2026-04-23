@@ -33,22 +33,52 @@ CHUNK_WORDS = 1000  # words per article chunk
 USE_FAMILIES = os.path.exists("claim_families_filtered.json")
 
 
+MAX_EMBED_WORDS = 1500  # keep each input under nomic-embed-text's 2048 token limit
+
+
+def _truncate_for_embed(s):
+    s = (s or "").strip()
+    if not s:
+        return " "  # nomic rejects empty strings; use a single space as a neutral placeholder
+    words = s.split()
+    if len(words) > MAX_EMBED_WORDS:
+        s = " ".join(words[:MAX_EMBED_WORDS])
+    return s
+
+
+def _embed_call(texts):
+    payload = json.dumps({"model": EMBED_MODEL, "input": texts}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{OLLAMA_HOST}/api/embed",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        body = resp.read().decode("utf-8")
+    return json.loads(body)["embeddings"]
+
+
 def embed_batch(texts, batch_size=16):
-    """Embed a list of strings. Returns np.array of shape (N, dim)."""
-    vectors = []
+    """Embed a list of strings. Falls back to single-item calls on batch failure
+    so a single bad input (empty, oversized) doesn't tank the whole run."""
+    texts = [_truncate_for_embed(t) for t in texts]
+    vectors = [None] * len(texts)
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
-        payload = json.dumps({"model": EMBED_MODEL, "input": batch}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{OLLAMA_HOST}/api/embed",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            body = resp.read().decode("utf-8")
-        data = json.loads(body)
-        vectors.extend(data["embeddings"])
+        try:
+            embs = _embed_call(batch)
+            for j, e in enumerate(embs):
+                vectors[i + j] = e
+        except Exception as e:
+            print(f"    batch {i}:{i+len(batch)} failed ({e}); retrying per-item")
+            for j, t in enumerate(batch):
+                try:
+                    vectors[i + j] = _embed_call([t])[0]
+                except Exception as single_e:
+                    print(f"      item {i + j} skipped: {single_e}")
+                    # fallback: zero vector — will never match anything in cosine space
+                    vectors[i + j] = [0.0] * 768
         if (i // batch_size) % 5 == 0:
             print(f"    embedded {min(i + batch_size, len(texts))}/{len(texts)}")
     arr = np.array(vectors, dtype=np.float32)

@@ -74,7 +74,7 @@ def call_llm(prompt, num_predict=4000):
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": 0, "num_predict": num_predict, "num_ctx": 16384},
+        "options": {"temperature": 0, "num_predict": num_predict, "num_ctx": 8192},
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{OLLAMA_HOST}/api/generate",

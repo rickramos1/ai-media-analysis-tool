@@ -103,6 +103,8 @@ python source_ideology_tagger.py --infile womens_health_articles_text.csv --outf
 | `stage4a_candidates.json` | 4a | top-K claim matches per article + global top pairs |
 | `stage4b_verdicts.json` | 4b | per-pair LLM verdicts |
 | `misinfo_carriers.csv` | 4b | final flagged carriers (one row per `carrying` verdict) |
+| `misinfo_carriers_by_article.csv` | (post) | one row per unique flagged article; multiple claims collected in `claims_carried_json` |
+| `FINDINGS.md` | (post) | human-readable summary report — methodology, top campaigns, top flagged articles, honest limits, reviewer workflow |
 | `keyword_trends.csv` / `keyword_trends.png` | (optional) | weekly keyword frequency |
 
 ## Project Structure
@@ -141,3 +143,5 @@ utils/media_utils.py                         # MediaCloud helpers
 - See `BACKLOG.md` for the cross-reference architecture spec, future iterations (DuckDB / GCP scalability, n-gram analysis, broader ideology coverage), and the rationale for the current design.
 - Scraping respects publishers — UA rotation and randomized delays help with static bot heuristics but do not defeat Cloudflare-tier WAFs (Newsweek, Forbes, ABC News, parts of WaPo currently fail).
 - All flagged articles in `misinfo_carriers.csv` carry full provenance: which claim was carried, which outlets debunked it, and the specific passage in the article that matched. Designed for human review before publication.
+- After Stage 4b, run a small post-processing block (see most recent run notes) to generate `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (a human-readable summary report with methodology, top campaigns, top flagged articles, honest limits, and a reviewer workflow). Hand `misinfo_carriers_by_article.csv` to reviewers; share `FINDINGS.md` with anyone reading the work.
+- The verifier sometimes returns `UNKNOWN` because qwen3 enters `<think>` mode despite `/no_think`. After a full Stage 4b run, if `UNKNOWN` count is >5% of verdicts, drop those rows from `stage4b_verdicts.json` and re-run — the resume logic will fill them back in at the higher `num_predict=1500` budget. In the corpus run that produced the current outputs, this recovery pass roughly doubled the carrier count (51 → 117).

@@ -18,11 +18,14 @@ stage3_filter.py             (Stage 3)          →  claims_verified.json + clai
 claim_normalizer.py          (Stage 3.5, LLM)   →  claim_families.json + claim_families_filtered.json
 stage4a_retrieval.py         (Stage 4a, embed)  →  stage4a_candidates.json + embeddings_*.npy
 stage4b_verify.py            (Stage 4b, LLM)    →  stage4b_verdicts.json + misinfo_carriers.csv
+(post-processing)                               →  misinfo_carriers_by_article.csv + FINDINGS.md
 keyword_analysis.py                             →  keyword_trends.csv, keyword_trends.png
 source_ideology_tagger.py                       →  tagged output
 ```
 
 `run_pipeline_1_to_4a.sh` orchestrates stages 1 → 4a end-to-end. Stage 4b is run separately because it's the longest LLM stage and the user wants explicit GPU windows for it.
+
+**Final reviewer outputs** are `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (human-readable report). Generate both with the post-processing block at the end of the most recent session — there's no script for it yet, but it's a ~50-line pandas/markdown writer.
 
 Run from the project root with the venv activated. `misinfo_detector.py` and the LLM stages support `--max-rows N` (or smoke-test patterns) — use them before a full run.
 
@@ -60,6 +63,9 @@ CSVs and pipeline JSON outputs in the repo root are gitignored. Don't commit. If
 - **Topic gate vocabulary**: `misinfo_detector.TOPIC_TERMS` must contain entries for every topic label in the current MediaCloud queries. Mismatched labels silently filter every article out (the `[gate]` log line will show `0 pass topic+context`). When you change `queries_public_collection_womens_health.py`, also update `TOPIC_TERMS`.
 - **Off-topic claim contamination**: broad fact-check articles (factcheck.org weekly roundups) extract claims unrelated to women's health (Medicaid, COVID, ADHD, weight-loss drugs). The Stage 3.5 `claim_normalizer.py` includes a `WOMENS_HEALTH_RX` filter that drops these from the family list. Verify the filter still catches the new contamination patterns when corpus changes.
 - **`OLLAMA_LLM_LIBRARY=cuda_v12` keeps reverting** on bigdoggie (the tray app re-asserts it). If the pipeline mysteriously slows, check `/api/ps` and that the model is fully on GPU — but the pipeline's own settings are robust to either CUDA library version. Don't fight this unless something else is broken.
+- **Stage 4b UNKNOWN parse failures**: ~20% of verifier calls return `UNKNOWN` because qwen3 burns through `num_predict` on a `<think>` block despite the `/no_think` directive in the prompt. The verifier currently uses `num_predict=1500` after a recovery pass demonstrated 80%+ of UNKNOWNs are recoverable at the higher budget. If you see `UNKNOWN` rates >5% in a fresh run, the recovery pattern is: drop UNKNOWN rows from `stage4b_verdicts.json` and re-run `stage4b_verify.py` (the resume logic will fill them back in). Carrier counts roughly doubled in the corpus run after this recovery (51 → 117).
+- **Stage 3.5 normalizer fragility**: `claim_normalizer.py` makes ONE big LLM call to cluster all claims at once. With ≥150 input claims at `num_ctx=8192`, qwen3 sometimes returns prose/markdown summaries instead of JSON. Stage 4a's fallback path (when `claim_families_filtered.json` is missing) reads `claims_verified.json` directly, so a normalizer failure doesn't break the pipeline — it just gives narrower retrieval. The proper fix (deferred) is to chunk the claims into batches of ~40 and merge family clusters via fuzzy matching of canonical claim texts.
+- **Stage 4a embedding resilience**: chunks longer than nomic-embed-text's 2048 tokens or empty strings cause `400 Bad Request`. The script now truncates each chunk to 1500 words and falls back to single-item embed calls on batch failure (filling failed items with zero vectors so they never match). No manual chunk cleanup needed.
 
 ## Performance baselines (for sanity-checking re-runs)
 

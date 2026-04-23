@@ -94,7 +94,7 @@ def verify(claim, article_title, article_outlet, article_text, max_retries=3):
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": 0, "num_predict": 500, "num_ctx": 8192},
+        "options": {"temperature": 0, "num_predict": 1500, "num_ctx": 8192},
     }).encode("utf-8")
 
     for _ in range(max_retries):
