@@ -20,10 +20,10 @@ import os
 import numpy as np
 import pandas as pd
 
-EMB_NPY = "article_topic_embeddings.npy"
-EMB_MANIFEST = "article_topic_embeddings_manifest.json"
-CLEAN_CSV = "womens_health_articles_text_clean.csv"
-OUT_CSV = "article_dedup_map.csv"
+EMB_NPY = "data/article_topic_embeddings.npy"
+EMB_MANIFEST = "data/article_topic_embeddings_manifest.json"
+CLEAN_CSV = "data/womens_health_articles_text_clean.csv"
+OUT_CSV = "data/article_dedup_map.csv"
 
 CANDIDATE_THRESHOLDS = [0.90, 0.92, 0.95, 0.97]
 DEFAULT_THRESHOLD = 0.95

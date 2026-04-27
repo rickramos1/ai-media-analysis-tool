@@ -20,10 +20,13 @@ OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
 
 csv.field_size_limit(2**30)
 
-INPUT_RAW = "womens_health_articles_text.csv"
-INPUT_CLEANED = "womens_health_articles_text_clean.csv"
-BAD_ROWS = "bad_rows.csv"
-OUTPUT_CSV = "misinfo_flagged_output.csv"
+INPUT_RAW = "data/womens_health_articles_text.csv"
+INPUT_CLEANED = "data/womens_health_articles_text_clean.csv"
+BAD_ROWS = "data/bad_rows.csv"
+OUTPUT_CSV = "data/misinfo_flagged_output.csv"
+SCORES_CSV = "data/article_topic_scores.csv"
+DEDUP_CSV = "data/article_dedup_map.csv"
+SEMANTIC_GATE_THRESHOLD = float(os.environ.get("SEMANTIC_GATE_THRESHOLD", "0.70"))
 
 # Topic relevance: per-topic vocabulary that must appear at least once. Terms
 # are clinical/regulatory only — no editorial loading like "misinformation".
@@ -198,17 +201,85 @@ def format_hms(seconds):
     return f"{h:02}:{m:02}:{s:02}"
 
 
-def filter_eligible(df):
+def _load_semantic_score_map(path):
+    if not os.path.exists(path):
+        return {}
+    df = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
+    if "url" not in df.columns or "semantic_topic_score" not in df.columns:
+        return {}
+    scores = pd.to_numeric(df["semantic_topic_score"], errors="coerce")
+    return dict(zip(df["url"], scores))
+
+
+def _load_non_canonical_keys(path):
+    """Return set of (url, topic) tuples flagged is_canonical=False.
+
+    The dedup map is keyed on (url, article_topic) because the same URL caught
+    by multiple topic queries is canonicalized to ONE topic and dropped from
+    the others (URL-collision pass). Joining on url alone would drop the
+    canonical instance too.
+    """
+    if not os.path.exists(path):
+        return set()
+    df = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
+    if not {"url", "is_canonical", "article_topic"}.issubset(df.columns):
+        return set()
+    is_canon = df["is_canonical"].astype(str).str.lower().isin(["true", "1"])
+    return set(zip(df.loc[~is_canon, "url"], df.loc[~is_canon, "article_topic"]))
+
+
+def filter_eligible(df, *, hybrid=True, semantic_threshold=SEMANTIC_GATE_THRESHOLD,
+                    scores_path=SCORES_CSV, dedup_path=DEDUP_CSV):
+    """Filter to eligible articles for downstream LLM stages.
+
+    Eligibility = passes_wc AND (passes_topic_gate OR passes_semantic_gate) AND is_canonical.
+
+    `hybrid=False` returns the legacy regex-only behavior; useful for shadow
+    comparisons (e.g. semantic_topic_gate.py's calibration report).
+    """
     df = df.copy()
     df["wc"] = df["full_text"].str.split().str.len().fillna(0).astype(int)
     df["passes_wc"] = df["wc"] >= 100
     df["passes_topic_gate"] = df.apply(
         lambda r: is_on_topic(r["topic"], r["full_text"]), axis=1
     )
-    df["eligible"] = df["passes_wc"] & df["passes_topic_gate"]
+
+    if hybrid:
+        score_map = _load_semantic_score_map(scores_path)
+        if score_map:
+            df["semantic_topic_score"] = df["url"].map(score_map)
+            df["passes_semantic_gate"] = (df["semantic_topic_score"] >= semantic_threshold).fillna(False)
+        else:
+            df["semantic_topic_score"] = float("nan")
+            df["passes_semantic_gate"] = False
+
+        non_canonical = _load_non_canonical_keys(dedup_path)
+        if non_canonical:
+            keys = list(zip(df["url"], df["topic"]))
+            df["is_canonical"] = [k not in non_canonical for k in keys]
+        else:
+            df["is_canonical"] = True
+    else:
+        df["semantic_topic_score"] = float("nan")
+        df["passes_semantic_gate"] = False
+        df["is_canonical"] = True
+
+    df["eligible"] = (
+        df["passes_wc"]
+        & (df["passes_topic_gate"] | df["passes_semantic_gate"])
+        & df["is_canonical"]
+    )
+
+    sem_only_admit = int(((~df["passes_topic_gate"]) & df["passes_semantic_gate"]
+                          & df["passes_wc"] & df["is_canonical"]).sum())
+    dedup_drops = int((~df["is_canonical"]).sum()) if hybrid else 0
+    sem_n = int(df["passes_semantic_gate"].sum())
     print(
-        f"[gate] {df.passes_wc.sum()} pass word count | "
-        f"{df.passes_topic_gate.sum()} pass topic+context | "
+        f"[gate] {df.passes_wc.sum()} pass wc | "
+        f"{df.passes_topic_gate.sum()} pass regex topic+context | "
+        f"{sem_n} pass semantic (>= {semantic_threshold:.2f}) | "
+        f"+{sem_only_admit} admitted via semantic only | "
+        f"-{dedup_drops} dropped as non-canonical | "
         f"{df.eligible.sum()} eligible for LLM"
     )
     return df

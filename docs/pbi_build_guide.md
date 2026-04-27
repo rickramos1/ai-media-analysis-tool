@@ -5,9 +5,9 @@ How to build the misinfo-carrier dashboard from the pipeline outputs. One-time m
 ## Prerequisites
 
 - Power BI Desktop installed on Windows (free, [download](https://www.microsoft.com/power-bi/desktop/))
-- Both CSV files copied to a stable folder on the Windows machine:
-  - `misinfo_carriers_pbi.csv` (117 rows — the carriers)
-  - `stage4b_all_verdicts_pbi.csv` (2,147 rows — all candidate verdicts, used for rate measures)
+- Both CSV files copied from `data/` on the server to a stable folder on the Windows machine:
+  - `data/misinfo_carriers_pbi.csv` (117 rows — the carriers)
+  - `data/stage4b_all_verdicts_pbi.csv` (2,147 rows — all candidate verdicts, used for rate measures)
 
 ## Step 1 — Import the data
 
@@ -101,7 +101,7 @@ Add **Slicer** visuals for cross-filtering:
 
 ## Refreshing after a new pipeline run
 
-1. Pipeline regenerates `misinfo_carriers_pbi.csv` and `stage4b_all_verdicts_pbi.csv`
+1. Pipeline regenerates `data/misinfo_carriers_pbi.csv` and `data/stage4b_all_verdicts_pbi.csv` on the server
 2. Copy them to the same folder on Windows (overwriting the old ones)
 3. Open the .pbix → **Home → Refresh**
 4. Save
@@ -112,6 +112,6 @@ That's it — no rebuild needed. The visuals re-bind to the updated data automat
 
 - **Article URLs are clickable**. Reviewers can click straight from the detail table to read the original article and verify the LLM's evidence quote.
 - **`reasoning` column** is included in the verdicts file but not the dashboard table by default — add it as a column tooltip if reviewers want one-glance LLM justification.
-- **`article_outlet_ideology`** is from a hardcoded map (`source_ideology_tagger.IDEOLOGY_MAP`). Two outlets in the current carriers set show as "Unknown" — extend the map and re-run the post-processing step to retag.
+- **`article_outlet_ideology`** is from a hardcoded map (`pipeline/source_ideology_tagger.py:IDEOLOGY_MAP`). Two outlets in the current carriers set show as "Unknown" — extend the map and re-run the post-processing step to retag.
 - **Date filtering**: `article_publish_date` is parsed from MediaCloud metadata. Some scraped articles have empty dates; they'll appear in a "(blank)" bucket on the time-series chart.
 - **Similarity threshold**: The dashboard shows results from a 0.65 cosine threshold. To see more / fewer, re-run Stage 4b with a different `STAGE4B_SIM` env var and regenerate the CSVs.

@@ -33,10 +33,10 @@ OLLAMA_PARALLEL = int(os.environ.get("OLLAMA_PARALLEL", "4"))
 
 csv.field_size_limit(2**30)
 
-CANDIDATES_JSON = "stage4a_candidates.json"
-ARTICLES_CSV = "articles_classified.csv"
-OUTPUT_JSON = "stage4b_verdicts.json"
-CARRIERS_CSV = "misinfo_carriers.csv"
+CANDIDATES_JSON = "data/stage4a_candidates.json"
+ARTICLES_CSV = "data/articles_classified.csv"
+OUTPUT_JSON = "data/stage4b_verdicts.json"
+CARRIERS_CSV = "data/misinfo_carriers.csv"
 SIM_THRESHOLD = float(os.environ.get("STAGE4B_SIM", "0.68"))
 VALID_VERDICTS = {"carrying", "debunking", "neutral_reporting", "irrelevant"}
 

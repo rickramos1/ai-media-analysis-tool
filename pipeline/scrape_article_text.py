@@ -8,8 +8,8 @@ import trafilatura
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_THREADS = 5
-DEFAULT_INPUT_FILE = "womens_health_articles.csv"
-DEFAULT_OUTPUT_FILE = "womens_health_articles_text.csv"
+DEFAULT_INPUT_FILE = "data/womens_health_articles.csv"
+DEFAULT_OUTPUT_FILE = "data/womens_health_articles_text.csv"
 
 # Rotate through realistic human-browser User-Agents, including DuckDuckGo
 # Privacy Browser on macOS/iOS/Android. Helps get past static bot-filter

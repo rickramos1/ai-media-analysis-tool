@@ -1,13 +1,13 @@
 """Stage 5: build reviewer outputs from Stage 4b verdicts.
 
-Reads `stage4b_verdicts.json` (and a few upstream artifacts for methodology
+Reads `data/stage4b_verdicts.json` (and a few upstream artifacts for methodology
 counts) and emits:
 
-- `misinfo_carriers_by_article.csv` — one row per unique flagged article,
+- `data/misinfo_carriers_by_article.csv` — one row per unique flagged article,
   with all carrier claims collected in `claims_carried_json`.
-- `FINDINGS.md` — human-readable report.
+- `docs/FINDINGS.md` — human-readable report.
 
-Run after `stage4b_verify.py` completes.
+Run after `pipeline/stage4b_verify.py` completes.
 """
 import argparse
 import csv
@@ -19,15 +19,15 @@ import pandas as pd
 
 csv.field_size_limit(2**30)
 
-DEFAULT_VERDICTS_JSON = "stage4b_verdicts.json"
-DEFAULT_ARTICLES_CLASSIFIED = "articles_classified.csv"
-DEFAULT_RAW_ARTICLES = "womens_health_articles.csv"
-DEFAULT_CLAIMS = "claims.json"
-DEFAULT_CLAIMS_VERIFIED = "claims_verified.json"
-DEFAULT_CANDIDATES = "stage4a_candidates.json"
-DEFAULT_CARRIERS_CSV = "misinfo_carriers.csv"
-DEFAULT_OUT_CSV = "misinfo_carriers_by_article.csv"
-DEFAULT_OUT_MD = "FINDINGS.md"
+DEFAULT_VERDICTS_JSON = "data/stage4b_verdicts.json"
+DEFAULT_ARTICLES_CLASSIFIED = "data/articles_classified.csv"
+DEFAULT_RAW_ARTICLES = "data/womens_health_articles.csv"
+DEFAULT_CLAIMS = "data/claims.json"
+DEFAULT_CLAIMS_VERIFIED = "data/claims_verified.json"
+DEFAULT_CANDIDATES = "data/stage4a_candidates.json"
+DEFAULT_CARRIERS_CSV = "data/misinfo_carriers.csv"
+DEFAULT_OUT_CSV = "data/misinfo_carriers_by_article.csv"
+DEFAULT_OUT_MD = "docs/FINDINGS.md"
 DEFAULT_TOP_N = 15
 STAGE4A_SIM_DEFAULT = float(os.environ.get("STAGE4A_SIM", "0.65"))
 STAGE4B_SIM_DEFAULT = float(os.environ.get("STAGE4B_SIM", "0.68"))
@@ -200,7 +200,7 @@ def render_findings(
     methodology_lines = [
         f"1. **Corpus** — {fmt(raw_articles) if raw_articles is not None else '?'} articles from MediaCloud, "
         f"scraped with `trafilatura`. {fmt(eligible_count) if eligible_count is not None else '?'} passed eligibility "
-        "(word count + topic-context gate).",
+        "(word count AND (regex topic-context gate OR semantic similarity ≥ 0.70) AND canonical-after-syndication-dedupe).",
         f"2. **Stage 1 — article classification** (`qwen3:14b`): "
         f"{fmt(class_counts.get('ORIGINAL', 0))} ORIGINAL, "
         f"{fmt(class_counts.get('FACT_CHECK', 0))} FACT_CHECK, "

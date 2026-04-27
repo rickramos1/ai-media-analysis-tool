@@ -13,7 +13,7 @@ Pipeline:
    distinguishing n-grams (cluster-frequency / corpus-frequency).
 5. Emit:
    - `article_clusters.csv` — per-article cluster assignment
-   - `narrative_clusters.md` — human-readable cluster summaries
+   - `docs/narrative_clusters.md` — human-readable cluster summaries
 
 Shadow mode — not wired into the pipeline.
 """
@@ -25,12 +25,12 @@ from collections import Counter, defaultdict
 import numpy as np
 import pandas as pd
 
-EMB_NPY = "article_topic_embeddings.npy"
-EMB_MANIFEST = "article_topic_embeddings_manifest.json"
-DEDUP_CSV = "article_dedup_map.csv"
-CLEAN_CSV = "womens_health_articles_text_clean.csv"
-OUT_CSV = "article_clusters.csv"
-OUT_MD = "narrative_clusters.md"
+EMB_NPY = "data/article_topic_embeddings.npy"
+EMB_MANIFEST = "data/article_topic_embeddings_manifest.json"
+DEDUP_CSV = "data/article_dedup_map.csv"
+CLEAN_CSV = "data/womens_health_articles_text_clean.csv"
+OUT_CSV = "data/article_clusters.csv"
+OUT_MD = "docs/narrative_clusters.md"
 
 SIM_THRESHOLD = 0.88
 MIN_CLUSTER_SIZE = 3

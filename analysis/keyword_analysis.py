@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 
-INPUT_FILE = "womens_health_articles_text.csv"
-OUTPUT_PLOT = "keyword_trends.png"
-OUTPUT_CSV = "keyword_trends.csv"
+INPUT_FILE = "data/womens_health_articles_text.csv"
+OUTPUT_PLOT = "data/keyword_trends.png"
+OUTPUT_CSV = "data/keyword_trends.csv"
 
 # Define keywords to track
 KEYWORDS = [

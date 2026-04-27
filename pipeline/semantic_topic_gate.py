@@ -40,13 +40,13 @@ if not OLLAMA_HOST.startswith("http"):
     OLLAMA_HOST = f"http://{OLLAMA_HOST}"
 EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
-CLEAN_CSV = "womens_health_articles_text_clean.csv"
-CLASSIFIED_CSV = "articles_classified.csv"
-SCORES_CSV = "article_topic_scores.csv"
-ARTICLE_EMB_NPY = "article_topic_embeddings.npy"
-ARTICLE_EMB_MANIFEST = "article_topic_embeddings_manifest.json"
-CENTROID_NPY = "topic_centroids.npy"
-CENTROID_MANIFEST = "topic_centroids_manifest.json"
+CLEAN_CSV = "data/womens_health_articles_text_clean.csv"
+CLASSIFIED_CSV = "data/articles_classified.csv"
+SCORES_CSV = "data/article_topic_scores.csv"
+ARTICLE_EMB_NPY = "data/article_topic_embeddings.npy"
+ARTICLE_EMB_MANIFEST = "data/article_topic_embeddings_manifest.json"
+CENTROID_NPY = "data/topic_centroids.npy"
+CENTROID_MANIFEST = "data/topic_centroids_manifest.json"
 
 LEAD_WORDS = 400
 SEEDS_PER_TOPIC = 10
@@ -190,8 +190,10 @@ def run():
     df_clean = pd.read_csv(CLEAN_CSV, dtype=str, keep_default_na=False, encoding="utf-8")
     print(f"[load] {CLEAN_CSV}: {len(df_clean)} rows")
 
-    # 2. Apply regex gate so we have the comparison column.
-    gated = filter_eligible(df_clean.copy())
+    # 2. Apply regex gate so we have the comparison column. Pass hybrid=False
+    #    so this script's shadow report stays a clean regex-vs-semantic compare,
+    #    independent of any prior scores/dedup map on disk.
+    gated = filter_eligible(df_clean.copy(), hybrid=False)
 
     # 3. Build seed set from prior classifier output.
     if os.path.exists(CLASSIFIED_CSV):

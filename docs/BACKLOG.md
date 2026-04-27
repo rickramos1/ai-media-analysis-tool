@@ -14,19 +14,20 @@ Stages 1–5 of the original cross-reference spec are shipped (`article_classifi
 
 UA rotation + realistic headers clears static WAF heuristics. Cloudflare-tier blocks (Newsweek, Forbes, ABC News, parts of WaPo) still 403. Next tier is `curl_cffi` (TLS fingerprint matching) or `playwright` (real browser). Measure what fraction of the corpus we're losing before committing — playwright adds real operational weight.
 
-## Article vectorization — wire up the shadow components
+## Article vectorization — shadow components wired in
 
 Two shadow-mode artifacts are shipped; both persist `nomic-embed-text` embeddings of every scraped article (title + first 400 words) and reuse the same `.npy`:
 
-- **Semantic topic gate** (`semantic_topic_gate.py`): scores each article against a per-topic centroid built from the MediaCloud query text plus seed articles. Current regex gate (`TOPIC_TERMS`) silently drops 200+ on-topic articles at every threshold probed; the overlap between ORIGINAL (p10 ≈ 0.71) and OTHER (p90 ≈ 0.77) score distributions means no clean flat cut.
-- **Syndicated-coverage dedupe** (`dedupe_articles.py`): clusters near-duplicate articles (cosine ≥ 0.95) via union-find. On the current corpus 19.2% of articles (286/1,486) are in multi-article clusters — a mix of scraping duplicates and cross-outlet syndicates. 28/65 flagged carriers in the last run are in such clusters.
+- **Semantic topic gate** (`pipeline/semantic_topic_gate.py`): scores each article against a per-topic centroid built from the MediaCloud query text plus seed articles. The original regex gate (`TOPIC_TERMS`) silently dropped 200+ on-topic articles; the overlap between ORIGINAL (p10 ≈ 0.71) and OTHER (p90 ≈ 0.77) score distributions means no clean flat cut, so the wire-up is *additive* — semantic admits supplement regex rather than replacing it.
+- **Syndicated-coverage dedupe** (`pipeline/dedupe_articles.py`): clusters near-duplicate articles (cosine ≥ 0.95) via union-find. On the current corpus 19.2% of articles (286/1,486) are in multi-article clusters — a mix of scraping duplicates and cross-outlet syndicates.
+
+**Shipped.** `filter_eligible` in `misinfo_detector.py` now admits `passes_wc AND (regex_pass OR semantic_score ≥ SEMANTIC_GATE_THRESHOLD) AND is_canonical`. Threshold defaults to 0.70 (override via env `SEMANTIC_GATE_THRESHOLD`). The dedupe map is joined on `(url, topic)` so URL-collision canonicals aren't double-dropped. `filter_eligible` accepts `hybrid=False` for shadow comparisons; `semantic_topic_gate.py`'s calibration report passes that to keep the regex baseline clean. Smoke counts on the current corpus: 1,159 → 988 eligible (-171 net = +63 semantic-only admits, -234 dedupe drops that legacy would have routed to Stage 1).
 
 Open follow-ups:
 
-- **Hybrid gate wire-up.** Change `filter_eligible` to admit `regex_pass OR semantic_score ≥ 0.70` — strictly additive, Stage 1 handles residual false positives. Ship alongside dedupe so one end-to-end re-run validates both.
-- **Dedupe wire-up.** Filter non-canonical cluster members before Stage 1. ~19% fewer LLM cycles across Stages 1/2/4b; cleaner syndication rollups in reviewer outputs.
-- **Per-topic thresholds or seed-set curation.** If the hybrid gate's recall/precision isn't enough, the cleanest next lever is per-topic calibration or hand-curated seed articles per topic (semantic gate already supports seed mixing in the centroid).
-- **Topic clustering for emergent narratives.** The embedding infra is in place; no script yet that clusters articles independent of the MediaCloud query labels to surface narratives that don't match a predefined topic.
+- **Validation rerun.** No end-to-end rerun yet — Stage 1+2+4b are the slow ones. Compare carrier yield/precision against the last shipped run before declaring this wired-up officially "good."
+- **Per-topic thresholds or seed-set curation.** If hybrid gate recall/precision isn't enough after the validation rerun, the cleanest next lever is per-topic calibration or hand-curated seed articles per topic (semantic gate already supports seed mixing in the centroid).
+- **Topic clustering for emergent narratives.** Shipped (`pipeline/cluster_articles.py` → `docs/narrative_clusters.md`).
 
 ## N-gram analysis of article topics
 

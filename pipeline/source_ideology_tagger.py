@@ -11,16 +11,16 @@ IDEOLOGY_MAP = {
     # Right
     "foxnews.com": "Right",
     "breitbart.com": "Right",
+    "dailycaller.com": "Right",
     "dailywire.com": "Right",
     "dailysignal.com": "Right",
     "townhall.com": "Right",
-    "dailycaller.com": "Right",
+    "ncregister.com": "Right",
     "nypost.com": "Right",
     "spectator.org": "Right",
     "pjmedia.com": "Right",
     "redstate.com": "Right",
     "patriotpost.us": "Right",
-    "ncregister.com": "Right",
     # Center-Right
     "wsj.com": "Center-Right",
     "forbes.com": "Center-Right",
@@ -123,14 +123,14 @@ def tag_ideology(input_file, output_file):
             rows.append(row)
 
     print(f"[OK] Tagged {len(rows)} articles with ideology.")
-    print(f"[WARN] {len(unmatched_sources)} unmatched sources. Logged to 'unmatched_sources.txt'.")
+    print(f"[WARN] {len(unmatched_sources)} unmatched sources. Logged to 'data/unmatched_sources.txt'.")
 
     with open(output_file, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys(), quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(rows)
 
-    with open("unmatched_sources.txt", "w", encoding="utf-8") as f:
+    with open("data/unmatched_sources.txt", "w", encoding="utf-8") as f:
         for source in sorted(unmatched_sources):
             f.write(source + "\n")
 

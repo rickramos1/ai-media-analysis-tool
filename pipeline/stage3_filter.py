@@ -18,9 +18,9 @@ from rapidfuzz import fuzz, process
 
 from source_ideology_tagger import IDEOLOGY_MAP
 
-INPUT_JSON = "claims.json"
-OUT_VERIFIED = "claims_verified.json"
-OUT_ALL = "claims_all_with_ideology.json"
+INPUT_JSON = "data/claims.json"
+OUT_VERIFIED = "data/claims_verified.json"
+OUT_ALL = "data/claims_all_with_ideology.json"
 
 FUZZY_THRESHOLD = 85  # token_set_ratio; 100 = identical, 85 = close match
 

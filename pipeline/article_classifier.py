@@ -2,7 +2,7 @@
 
 Classifies each article as FACT_CHECK, ORIGINAL, or OTHER. Inputs are eligible
 rows from the preprocessed corpus. Output adds `article_type` and `classifier_reason`
-columns. See BACKLOG.md "Cross-reference misinfo detection" for the full spec.
+columns. See docs/BACKLOG.md "Cross-reference misinfo detection" for the full spec.
 """
 import csv
 import os
@@ -26,8 +26,8 @@ OLLAMA_PARALLEL = int(os.environ.get("OLLAMA_PARALLEL", "4"))
 
 csv.field_size_limit(2**30)
 
-INPUT_CSV = "womens_health_articles_text_clean.csv"
-OUTPUT_CSV = "articles_classified.csv"
+INPUT_CSV = "data/womens_health_articles_text_clean.csv"
+OUTPUT_CSV = "data/articles_classified.csv"
 VALID_TYPES = {"FACT_CHECK", "ORIGINAL", "OTHER"}
 
 PROMPT_TEMPLATE = """/no_think

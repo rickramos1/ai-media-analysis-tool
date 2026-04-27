@@ -71,64 +71,79 @@ The pipeline scripts default to `num_ctx=8192` so they coexist with `NUM_PARALLE
 
 Run scripts in order. Each is idempotent — re-running picks up from checkpoints where applicable.
 
+All scripts run from the project root.
+
 ```bash
 # 1. Query MediaCloud (10 carrier-focused topic queries)
-python queries_public_collection_womens_health.py
+python pipeline/queries_public_collection_womens_health.py
 
 # 2. Scrape full text (trafilatura, UA rotation, brotli)
-python scrape_article_text.py
+python pipeline/scrape_article_text.py
 
 # 3-7: Cross-reference misinfo pipeline (or use the orchestrator below)
-./run_pipeline_1_to_4a.sh   # runs preprocess + stages 1, 2, 3, 3.5, 4a
-python stage4b_verify.py    # Stage 4b — run when GPU is available
+./run_pipeline_1_to_4a.sh             # runs preprocess + stages 1, 2, 3, 3.5, 4a
+python pipeline/stage4b_verify.py     # Stage 4b — run when GPU is available
+python pipeline/stage5_report.py      # Stage 5 — generates carriers-by-article + docs/FINDINGS.md
 
 # Optional: keyword trends + ideology tagging
-python keyword_analysis.py
-python source_ideology_tagger.py --infile womens_health_articles_text.csv --outfile tagged_output.csv
+python analysis/keyword_analysis.py
+python pipeline/source_ideology_tagger.py --infile data/womens_health_articles_text.csv --outfile data/tagged_output.csv
 ```
 
 ## Output Files
 
+All pipeline outputs live in `data/`. Reports live in `docs/`.
+
 | File | Stage | Description |
 |---|---|---|
-| `womens_health_articles.csv` | Query | MediaCloud article metadata |
-| `womens_health_articles_text.csv` | Scrape | + scraped `full_text` |
-| `womens_health_articles_text_clean.csv` | Preprocess | malformed-row filter |
-| `articles_classified.csv` | 1 | + `article_type` (FACT_CHECK / ORIGINAL / OTHER), `classifier_reason` |
-| `claims.json` | 2 | claims debunked in each FACT_CHECK article |
-| `claims_all_with_ideology.json` | 3 | normalized claim sources + outlet ideologies |
-| `claims_verified.json` | 3 | claims passing the ideology cross-reference |
-| `claim_families.json` / `claim_families_filtered.json` | 3.5 | canonical claim families (full + women's-health filtered) |
-| `embeddings_article_chunks.npy` / `embeddings_claims.npy` | 4a | persisted 768-dim vectors (reusable for clustering / dedup) |
-| `stage4a_candidates.json` | 4a | top-K claim matches per article + global top pairs |
-| `stage4b_verdicts.json` | 4b | per-pair LLM verdicts |
-| `misinfo_carriers.csv` | 4b | final flagged carriers (one row per `carrying` verdict) |
-| `misinfo_carriers_by_article.csv` | (post) | one row per unique flagged article; multiple claims collected in `claims_carried_json` |
-| `FINDINGS.md` | (post) | human-readable summary report — methodology, top campaigns, top flagged articles, honest limits, reviewer workflow |
-| `misinfo_carriers_pbi.csv` | (post) | Power BI-ready carriers data, enriched with outlet ideology + publish date |
-| `stage4b_all_verdicts_pbi.csv` | (post) | full verdict set for PBI rate/proportion measures |
-| `pbi_build_guide.md` | (post) | step-by-step Windows-side guide for building the dashboard .pbix |
-| `keyword_trends.csv` / `keyword_trends.png` | (optional) | weekly keyword frequency |
+| `data/womens_health_articles.csv` | Query | MediaCloud article metadata |
+| `data/womens_health_articles_text.csv` | Scrape | + scraped `full_text` |
+| `data/womens_health_articles_text_clean.csv` | Preprocess | malformed-row filter |
+| `data/articles_classified.csv` | 1 | + `article_type` (FACT_CHECK / ORIGINAL / OTHER), `classifier_reason` |
+| `data/claims.json` | 2 | claims debunked in each FACT_CHECK article |
+| `data/claims_all_with_ideology.json` | 3 | normalized claim sources + outlet ideologies |
+| `data/claims_verified.json` | 3 | claims passing the ideology cross-reference |
+| `data/claim_families.json` / `data/claim_families_filtered.json` | 3.5 | canonical claim families (full + women's-health filtered) |
+| `data/embeddings_article_chunks.npy` / `data/embeddings_claims.npy` | 4a | persisted 768-dim vectors (reusable for clustering / dedup) |
+| `data/stage4a_candidates.json` | 4a | top-K claim matches per article + global top pairs |
+| `data/stage4b_verdicts.json` | 4b | per-pair LLM verdicts |
+| `data/misinfo_carriers.csv` | 4b | final flagged carriers (one row per `carrying` verdict) |
+| `data/misinfo_carriers_by_article.csv` | 5 | one row per unique flagged article; multiple claims collected in `claims_carried_json` |
+| `docs/FINDINGS.md` | 5 | human-readable summary report — methodology, top campaigns, top flagged articles, honest limits, reviewer workflow |
+| `data/misinfo_carriers_pbi.csv` | (post) | Power BI-ready carriers data, enriched with outlet ideology + publish date |
+| `data/stage4b_all_verdicts_pbi.csv` | (post) | full verdict set for PBI rate/proportion measures |
+| `docs/pbi_build_guide.md` | (post) | step-by-step Windows-side guide for building the dashboard .pbix |
+| `data/keyword_trends.csv` / `data/keyword_trends.png` | (optional) | weekly keyword frequency |
 
 ## Project Structure
 
 ```
-config.py                                    # MediaCloud API client
-queries_public_collection_womens_health.py   # MediaCloud queries (carrier-focused)
-scrape_article_text.py                       # Trafilatura + UA rotation
-misinfo_detector.py                          # First-pass detector + shared filter helpers
-article_classifier.py                        # Stage 1: FACT_CHECK / ORIGINAL / OTHER
-claim_extractor.py                           # Stage 2: structured claim extraction
-stage3_filter.py                             # Stage 3: ideology + auth-solo cross-reference
-claim_normalizer.py                          # Stage 3.5: cluster claims into families
-stage4a_retrieval.py                         # Stage 4a: embed + cosine retrieve
-stage4b_verify.py                            # Stage 4b: LLM verification
-run_pipeline_1_to_4a.sh                      # Orchestrator for stages 1 → 4a
-keyword_analysis.py                          # (optional) keyword trends
-source_ideology_tagger.py                    # Outlet ideology map (Right/Center/Left buckets)
-BACKLOG.md                                   # Future work + architecture spec
-groups/                                      # Media source group definitions
-utils/media_utils.py                         # MediaCloud helpers
+pipeline/
+├── config.py                                    # MediaCloud API client
+├── queries_public_collection_womens_health.py   # MediaCloud queries (carrier-focused)
+├── scrape_article_text.py                       # Trafilatura + UA rotation
+├── misinfo_detector.py                          # First-pass detector + shared filter helpers
+├── article_classifier.py                        # Stage 1: FACT_CHECK / ORIGINAL / OTHER
+├── claim_extractor.py                           # Stage 2: structured claim extraction
+├── stage3_filter.py                             # Stage 3: ideology + auth-solo cross-reference
+├── claim_normalizer.py                          # Stage 3.5: cluster claims into families
+├── stage4a_retrieval.py                         # Stage 4a: embed + cosine retrieve
+├── stage4b_verify.py                            # Stage 4b: LLM verification
+├── stage5_report.py                             # Stage 5: carriers-by-article + docs/FINDINGS.md
+├── source_ideology_tagger.py                    # Outlet ideology map (Right/Center/Left buckets)
+├── semantic_topic_gate.py                       # Embedding-based topic relevance gate (shadow)
+├── dedupe_articles.py                           # Syndicated-coverage dedupe (shadow)
+└── cluster_articles.py                          # Emergent narrative clustering
+analysis/
+└── keyword_analysis.py                          # (optional) keyword trends
+utils/media_utils.py                             # MediaCloud helpers (vestigial)
+groups/                                          # Media source group definitions
+docs/                                            # BACKLOG.md, FINDINGS.md, narrative_clusters.md, pbi_build_guide.md
+data/                                            # all pipeline data outputs (gitignored)
+data/backups/                                    # *.bak.YYYYMMDD archives
+data/logs/                                       # *.log run logs
+data/archive/                                    # superseded outputs (pre-cross-reference, old keyword analysis)
+run_pipeline_1_to_4a.sh                          # Orchestrator for stages 1 → 4a
 ```
 
 ## APIs and Tools
@@ -143,8 +158,8 @@ utils/media_utils.py                         # MediaCloud helpers
 
 ## Notes
 
-- See `BACKLOG.md` for the cross-reference architecture spec, future iterations (DuckDB / GCP scalability, n-gram analysis, broader ideology coverage), and the rationale for the current design.
+- See `docs/BACKLOG.md` for the cross-reference architecture spec, future iterations (DuckDB / GCP scalability, n-gram analysis, broader ideology coverage), and the rationale for the current design.
 - Scraping respects publishers — UA rotation and randomized delays help with static bot heuristics but do not defeat Cloudflare-tier WAFs (Newsweek, Forbes, ABC News, parts of WaPo currently fail).
-- All flagged articles in `misinfo_carriers.csv` carry full provenance: which claim was carried, which outlets debunked it, and the specific passage in the article that matched. Designed for human review before publication.
-- After Stage 4b, run a small post-processing block (see most recent run notes) to generate `misinfo_carriers_by_article.csv` (one row per unique flagged article) and `FINDINGS.md` (a human-readable summary report with methodology, top campaigns, top flagged articles, honest limits, and a reviewer workflow). Hand `misinfo_carriers_by_article.csv` to reviewers; share `FINDINGS.md` with anyone reading the work.
-- The verifier sometimes returns `UNKNOWN` because qwen3 enters `<think>` mode despite `/no_think`. After a full Stage 4b run, if `UNKNOWN` count is >5% of verdicts, drop those rows from `stage4b_verdicts.json` and re-run — the resume logic will fill them back in at the higher `num_predict=1500` budget. In the corpus run that produced the current outputs, this recovery pass roughly doubled the carrier count (51 → 117).
+- All flagged articles in `data/misinfo_carriers.csv` carry full provenance: which claim was carried, which outlets debunked it, and the specific passage in the article that matched. Designed for human review before publication.
+- After Stage 4b, run `python pipeline/stage5_report.py` to generate `data/misinfo_carriers_by_article.csv` (one row per unique flagged article) and `docs/FINDINGS.md` (a human-readable summary report with methodology, top campaigns, top flagged articles, honest limits, and a reviewer workflow). Hand `misinfo_carriers_by_article.csv` to reviewers; share `FINDINGS.md` with anyone reading the work.
+- The verifier sometimes returns `UNKNOWN` because qwen3 enters `<think>` mode despite `/no_think`. After a full Stage 4b run, if `UNKNOWN` count is >5% of verdicts, drop those rows from `data/stage4b_verdicts.json` and re-run — the resume logic will fill them back in at the higher `num_predict=1500` budget. In the corpus run that produced the current outputs, this recovery pass roughly doubled the carrier count (51 → 117).

@@ -9,7 +9,7 @@ import time
 # Carrier-focused queries: use the promotional/advocacy language that misinfo
 # carriers use, not the meta-vocabulary fact-checkers use (myth, hoax,
 # misinformation). NOT-clauses help exclude debunkers of the same terms.
-# See BACKLOG.md "Cross-reference misinfo detection" for context.
+# See docs/BACKLOG.md "Cross-reference misinfo detection" for context.
 TOPIC_QUERIES = {
     "abortion pill reversal": (
         '("abortion pill reversal" OR "APR protocol" OR "mifepristone reversal") '
@@ -127,7 +127,7 @@ def run_womens_health_queries():
 
     print(f"\nTotal articles collected: {len(all_articles)}")
 
-    output_file = "womens_health_articles.csv"
+    output_file = "data/womens_health_articles.csv"
     fieldnames = ["topic", "title", "url", "publish_date", "media_name", "media_url", "language", "story_id"]
     with open(output_file, "w", newline='', encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

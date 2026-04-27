@@ -25,9 +25,9 @@ if not OLLAMA_HOST.startswith("http"):
     OLLAMA_HOST = f"http://{OLLAMA_HOST}"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:14b")
 
-INPUT_CLAIMS = "claims.json"
-OUTPUT_FAMILIES = "claim_families.json"
-OUTPUT_FILTERED = "claim_families_filtered.json"
+INPUT_CLAIMS = "data/claims.json"
+OUTPUT_FAMILIES = "data/claim_families.json"
+OUTPUT_FILTERED = "data/claim_families_filtered.json"
 
 # Women's-health vocabulary. Families whose canonical_claim matches this keep
 # going to Stage 4a; others are off-topic contamination from broad fact-check

@@ -24,13 +24,13 @@ EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 csv.field_size_limit(2**30)
 
-CLAIMS_JSON = "claims_verified.json"
-FAMILIES_JSON = "claim_families_filtered.json"
-ARTICLES_CSV = "articles_classified.csv"
-OUTPUT_JSON = "stage4a_candidates.json"
+CLAIMS_JSON = "data/claims_verified.json"
+FAMILIES_JSON = "data/claim_families_filtered.json"
+ARTICLES_CSV = "data/articles_classified.csv"
+OUTPUT_JSON = "data/stage4a_candidates.json"
 
 CHUNK_WORDS = 1000  # words per article chunk
-USE_FAMILIES = os.path.exists("claim_families_filtered.json")
+USE_FAMILIES = os.path.exists(FAMILIES_JSON)
 
 
 MAX_EMBED_WORDS = 1500  # keep each input under nomic-embed-text's 2048 token limit
@@ -173,8 +173,8 @@ def run():
 
     # Persist embeddings for reuse (BACKLOG: topic clustering / dedup / semantic gate).
     # Saved as L2-normalized 768-dim vectors; cosine == dot product.
-    np.save("embeddings_article_chunks.npy", chunk_vecs)
-    np.save("embeddings_claims.npy", claim_vecs)
+    np.save("data/embeddings_article_chunks.npy", chunk_vecs)
+    np.save("data/embeddings_claims.npy", claim_vecs)
     chunk_manifest = [
         {
             "chunk_idx": i,
@@ -186,9 +186,9 @@ def run():
         }
         for i in range(len(chunk_texts))
     ]
-    with open("embeddings_article_chunks_manifest.json", "w") as f:
+    with open("data/embeddings_article_chunks_manifest.json", "w") as f:
         json.dump({"model": EMBED_MODEL, "dim": int(chunk_vecs.shape[1]), "chunks": chunk_manifest}, f)
-    with open("embeddings_claims_manifest.json", "w") as f:
+    with open("data/embeddings_claims_manifest.json", "w") as f:
         json.dump({"model": EMBED_MODEL, "dim": int(claim_vecs.shape[1]),
                    "claims": [{"claim_id": c["claim_id"], "claim_text": c["claim_text"]} for c in claims]}, f)
     print(f"[persist] embeddings_article_chunks.npy ({chunk_vecs.nbytes/1e6:.1f} MB), embeddings_claims.npy, manifests written")

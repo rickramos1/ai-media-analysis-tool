@@ -3,7 +3,7 @@
 For each FACT_CHECK article (as classified by article_classifier.py), extract
 structured debunked claims: what was claimed, who claimed it, how the article
 refutes it, and what evidence is cited. Output is a JSON array of article
-objects, each with a list of claims. See BACKLOG.md for the full architecture.
+objects, each with a list of claims. See docs/BACKLOG.md for the full architecture.
 """
 import csv
 import os
@@ -27,8 +27,8 @@ OLLAMA_PARALLEL = int(os.environ.get("OLLAMA_PARALLEL", "4"))
 
 csv.field_size_limit(2**30)
 
-INPUT_CSV = "articles_classified.csv"
-OUTPUT_JSON = "claims.json"
+INPUT_CSV = "data/articles_classified.csv"
+OUTPUT_JSON = "data/claims.json"
 
 PROMPT_TEMPLATE = """/no_think
 You are extracting claims from a fact-checking article. Identify claims the article REFUTES or DEBUNKS — not claims the article itself is making.
