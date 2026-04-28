@@ -5,18 +5,28 @@ Many debunked claims are restatements of the same underlying misinfo frame
 abortifacients"). Stage 4a retrieves against these family-level canonicals
 rather than literal quoted claims so it catches broader frames.
 
+Design: chunked clustering with cross-batch fuzzy merge. The original
+single-LLM-call design returned prose summaries instead of JSON above ~150
+input claims (qwen3 num_ctx=8192 fragility). We now batch claims into
+chunks of ~40, cluster each batch, and merge resulting families across
+batches by fuzzy-matching the canonical_claim text.
+
 Outputs:
 - claim_families.json           — all families
 - claim_families_filtered.json  — families whose canonical claim is women's-health-relevant
                                   (drops off-topic claims that got in via contaminated
                                   fact-check roundups — ADHD meds, COVID, Medicaid, etc.)
 """
+import argparse
 import json
 import os
 import re
+import time
 import urllib.request
+from collections import defaultdict
 
 from dotenv import load_dotenv
+from rapidfuzz import fuzz, process
 
 load_dotenv()
 
@@ -28,6 +38,9 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:14b")
 INPUT_CLAIMS = "data/claims.json"
 OUTPUT_FAMILIES = "data/claim_families.json"
 OUTPUT_FILTERED = "data/claim_families_filtered.json"
+
+DEFAULT_CHUNK_SIZE = 40
+MERGE_FUZZ_THRESHOLD = 80  # rapidfuzz token_set_ratio; matches Stage 3's source-name threshold
 
 # Women's-health vocabulary. Families whose canonical_claim matches this keep
 # going to Stage 4a; others are off-topic contamination from broad fact-check
@@ -62,18 +75,48 @@ Rules:
 - Canonical claims should be specific enough to be testable in an article (not "vaccines are dangerous" but "the HPV vaccine causes infertility").
 - Use neutral phrasing. Do not label claims as "misleading" or "false" — just state the claim itself.
 - Group claims that share the same underlying factual assertion, even if they attribute the claim to different people.
-- Aim for 10–20 families. Claims with unique content can be their own family.
+- Aim for 5–12 families given this batch size. Claims with unique content can be their own family.
 
 CLAIMS TO CLUSTER:
 {claims_block}
 """
 
 
-def call_llm(prompt, num_predict=4000):
+FAMILY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "families": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "canonical_claim": {"type": "string"},
+                    "member_ids": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["id", "canonical_claim", "member_ids"],
+            },
+        },
+    },
+    "required": ["families"],
+}
+
+
+def call_llm(prompt, num_predict=1500):
     payload = json.dumps({
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        # Ollama's native reasoning toggle. The `/no_think` prompt directive is
+        # silently ignored by qwen3:14b, which then burns the entire num_predict
+        # budget on a <think> block and returns empty `response`. think=false
+        # makes the model emit the answer directly.
+        "think": False,
+        # Schema-constrained generation (Ollama 0.5+). Token-level masking
+        # guarantees the response parses as JSON matching FAMILY_SCHEMA, which
+        # eliminates the prose-summary failure mode that previously affected
+        # ~1 in 5 batches at chunk_size=40 even with think=false.
+        "format": FAMILY_SCHEMA,
         "options": {"temperature": 0, "num_predict": num_predict, "num_ctx": 8192},
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -97,9 +140,93 @@ def extract_json(s):
         return None
 
 
-def run():
-    # Read the flat list of verified-source refutations from claims.json.
-    # Each refutation is a distinct claim_text; assign a dense claim_id.
+def cluster_batch(batch_claims):
+    """Cluster one batch of claims via the LLM. Returns list of
+    {canonical_claim, member_ids} dicts (member_ids restricted to this batch).
+
+    On parse failure: each claim becomes its own singleton family so nothing
+    is lost — downstream merge handles dedupe.
+    """
+    expected_ids = {c["claim_id"] for c in batch_claims}
+    lines = [
+        f"  id={c['claim_id']} [topic={c['topic']}] [source={c['claim_source']}] {c['claim_text']}"
+        for c in batch_claims
+    ]
+    prompt = PROMPT.format(claims_block="\n".join(lines))
+
+    t0 = time.time()
+    resp = call_llm(prompt)
+    elapsed = time.time() - t0
+
+    parsed = extract_json(resp)
+    if not parsed or "families" not in parsed:
+        print(f"  [batch] {elapsed:.1f}s — PARSE FAILED, falling back to singletons "
+              f"({len(batch_claims)} claims)")
+        return [{"canonical_claim": c["claim_text"], "member_ids": [c["claim_id"]]}
+                for c in batch_claims]
+
+    families = parsed["families"]
+    # Restrict member_ids to expected set; collect any unassigned and add as singletons.
+    cleaned = []
+    seen_ids = set()
+    for fam in families:
+        canon = (fam.get("canonical_claim") or "").strip()
+        if not canon:
+            continue
+        members = [mid for mid in (fam.get("member_ids") or []) if mid in expected_ids]
+        if not members:
+            continue
+        cleaned.append({"canonical_claim": canon, "member_ids": members})
+        seen_ids.update(members)
+
+    missing = expected_ids - seen_ids
+    if missing:
+        for c in batch_claims:
+            if c["claim_id"] in missing:
+                cleaned.append({"canonical_claim": c["claim_text"], "member_ids": [c["claim_id"]]})
+        print(f"  [batch] {elapsed:.1f}s — {len(cleaned)} families ({len(missing)} unassigned → singletons)")
+    else:
+        print(f"  [batch] {elapsed:.1f}s — {len(cleaned)} families covering all {len(expected_ids)} claims")
+
+    return cleaned
+
+
+def merge_families(batch_families):
+    """Union families across batches by fuzzy-matching canonical_claim text.
+
+    Two families merge if their canonical_claim has token_set_ratio ≥
+    MERGE_FUZZ_THRESHOLD. On merge, member_ids are unioned and the shorter
+    canonical text wins (favors crisper phrasing).
+    """
+    merged = []  # list of {canonical_claim, member_ids: set}
+    for fam in batch_families:
+        canon = fam["canonical_claim"]
+        members = set(fam["member_ids"])
+        if not merged:
+            merged.append({"canonical_claim": canon, "member_ids": members})
+            continue
+        match = process.extractOne(
+            canon,
+            [m["canonical_claim"] for m in merged],
+            scorer=fuzz.token_set_ratio,
+            score_cutoff=MERGE_FUZZ_THRESHOLD,
+        )
+        if match:
+            matched_canon = match[0]
+            for m in merged:
+                if m["canonical_claim"] == matched_canon:
+                    m["member_ids"] |= members
+                    if len(canon) < len(m["canonical_claim"]):
+                        m["canonical_claim"] = canon
+                    break
+        else:
+            merged.append({"canonical_claim": canon, "member_ids": members})
+    return merged
+
+
+def run(chunk_size=DEFAULT_CHUNK_SIZE):
+    # Read the flat list of refutations from claims.json. Each refutation is
+    # a distinct claim_text; assign a dense claim_id.
     with open(INPUT_CLAIMS) as f:
         raw = json.load(f)
     claims = []
@@ -119,41 +246,47 @@ def run():
                 "fact_check_outlet": outlet,
                 "topic": topic,
             })
-    print(f"[normalize] clustering {len(claims)} unique claim-texts")
+    print(f"[normalize] clustering {len(claims)} unique claim-texts in chunks of {chunk_size}")
 
-    lines = []
-    for c in claims:
-        lines.append(f"  id={c['claim_id']} [topic={c['topic']}] [source={c['claim_source']}] {c['claim_text']}")
-    prompt = PROMPT.format(claims_block="\n".join(lines))
+    # Sort by topic so within-batch clustering has more semantic coherence
+    # (cross-batch duplicates still get merged by fuzzy match).
+    claims_sorted = sorted(claims, key=lambda c: (c.get("topic") or "", c["claim_id"]))
 
-    print("[normalize] calling LLM...")
-    import time
-    t0 = time.time()
-    resp = call_llm(prompt)
-    print(f"[normalize] LLM done in {time.time()-t0:.1f}s")
+    # Per-batch LLM clustering
+    all_batch_families = []
+    n_batches = (len(claims_sorted) + chunk_size - 1) // chunk_size
+    for i in range(0, len(claims_sorted), chunk_size):
+        batch = claims_sorted[i:i + chunk_size]
+        bnum = i // chunk_size + 1
+        print(f"[normalize] batch {bnum}/{n_batches} ({len(batch)} claims)")
+        all_batch_families.extend(cluster_batch(batch))
 
-    parsed = extract_json(resp)
-    if not parsed or "families" not in parsed:
-        print("[ERROR] failed to parse response")
-        print("Raw response:", repr(resp[:2000]))
-        return
+    # Cross-batch merge
+    print(f"\n[normalize] {len(all_batch_families)} per-batch families → merging by canonical-claim fuzzy match")
+    merged = merge_families(all_batch_families)
+    print(f"[normalize] merged into {len(merged)} global families")
 
-    families = parsed["families"]
+    # Assign global ids and validate coverage
+    families = []
+    all_assigned = []
+    for i, m in enumerate(merged):
+        fam = {
+            "id": i + 1,
+            "canonical_claim": m["canonical_claim"],
+            "member_ids": sorted(m["member_ids"]),
+        }
+        families.append(fam)
+        all_assigned.extend(fam["member_ids"])
 
-    # Validate: every claim_id accounted for exactly once
     all_claim_ids = {c["claim_id"] for c in claims}
-    assigned = []
-    for fam in families:
-        assigned.extend(fam["member_ids"])
-    assigned_set = set(assigned)
+    assigned_set = set(all_assigned)
     missing = all_claim_ids - assigned_set
-    dupes = [x for x in assigned if assigned.count(x) > 1]
-
-    print(f"\n[normalize] got {len(families)} families covering {len(assigned_set)}/{len(all_claim_ids)} claims")
+    dupes = [x for x in all_assigned if all_assigned.count(x) > 1]
+    print(f"[normalize] coverage: {len(assigned_set)}/{len(all_claim_ids)} claims assigned")
     if missing:
         print(f"  ⚠ unassigned claim_ids: {sorted(missing)}")
     if dupes:
-        print(f"  ⚠ duplicate assignments: {sorted(set(dupes))}")
+        print(f"  ⚠ claims assigned to multiple families: {sorted(set(dupes))}")
 
     # Cross-reference family members with the original claims so output is self-contained
     claims_by_id = {c["claim_id"]: c for c in claims}
@@ -181,8 +314,8 @@ def run():
         json.dump({"families": kept}, f, indent=2)
     print(f"[write] {OUTPUT_FILTERED} — kept {len(kept)} women's-health families, dropped {len(dropped)} off-topic")
 
-    print("\n=== Canonical claim families ===")
-    for fam in sorted(families, key=lambda x: -len(x.get("member_ids", []))):
+    print("\n=== Canonical claim families (top 20 by member count) ===")
+    for fam in sorted(families, key=lambda x: -len(x.get("member_ids", [])))[:20]:
         print(f"\n[family {fam['id']}] ({len(fam['member_ids'])} members)")
         print(f"  canonical: {fam['canonical_claim']}")
         for m in fam.get("members", [])[:3]:
@@ -192,4 +325,8 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE,
+                    help=f"Claims per LLM call (default {DEFAULT_CHUNK_SIZE})")
+    args = ap.parse_args()
+    run(chunk_size=args.chunk_size)

@@ -6,10 +6,15 @@ claims to the canonical database only if they're debunked by outlets from ≥2
 different ideology buckets. This filters out one-side-attacking-the-other
 editorial assertions.
 
+Optional --extra-input <path> unions in additional claim records (same shape
+as claims.json) — used to merge external fact-check sources, see
+`pipeline/external_factchecks.py`.
+
 Outputs:
 - claims_verified.json: only claims with multi-ideology corroboration
 - claims_all_with_ideology.json: full set with ideology annotations
 """
+import argparse
 import json
 from collections import defaultdict
 from urllib.parse import urlparse
@@ -31,6 +36,10 @@ FUZZY_THRESHOLD = 85  # token_set_ratio; 100 = identical, 85 = close match
 AUTHORITATIVE_SOLO = {
     "factcheck.org", "scientificamerican.com", "npr.org", "cbsnews.com",
     "theguardian.com", "wired.com", "usatoday.com", "latimes.com",
+    # Major fact-check operations whose solo verdict is authoritative.
+    # Added when external fact-check seed surfaced these outlets in the
+    # canonical-claim universe (pipeline/external_factchecks.py).
+    "politifact.com", "snopes.com", "apnews.com", "factcheck.afp.com",
 }
 
 
@@ -78,9 +87,21 @@ def normalize_source_names(raw_names):
     return canonical
 
 
-def run():
+def run(extra_inputs=None):
     with open(INPUT_JSON) as f:
         articles = json.load(f)
+    base_n = len(articles)
+    seen_urls = {a.get("article_url") for a in articles}
+    for path in extra_inputs or []:
+        with open(path) as f:
+            extra = json.load(f)
+        added = [a for a in extra if a.get("article_url") not in seen_urls]
+        seen_urls.update(a.get("article_url") for a in added)
+        articles.extend(added)
+        print(f"[merge] +{len(added)} articles from {path} "
+              f"({len(extra) - len(added)} skipped as duplicate URLs)")
+    if extra_inputs:
+        print(f"[merge] base {base_n} + extras {len(articles) - base_n} = {len(articles)} total")
 
     # Collect raw claim sources
     raw_sources = []
@@ -195,4 +216,8 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--extra-input", action="append", default=[],
+                    help="Additional claims.json-shaped file(s) to union into Stage 3 input")
+    args = ap.parse_args()
+    run(extra_inputs=args.extra_input)

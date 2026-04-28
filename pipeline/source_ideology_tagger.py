@@ -21,6 +21,8 @@ IDEOLOGY_MAP = {
     "pjmedia.com": "Right",
     "redstate.com": "Right",
     "patriotpost.us": "Right",
+    "newsbusters.org": "Right",
+    "theblaze.com": "Right",
     # Center-Right
     "wsj.com": "Center-Right",
     "forbes.com": "Center-Right",
@@ -38,6 +40,25 @@ IDEOLOGY_MAP = {
     "benzinga.com": "Center",
     "factcheck.org": "Center",
     "staradvertiser.com": "Center",
+    # Independent fact-check operations (IFCN-certified or equivalent;
+    # editorial stance generally Center). Added when external fact-check
+    # seed (pipeline/external_factchecks.py) surfaced these outlets.
+    "politifact.com": "Center",
+    "snopes.com": "Center",
+    "factcheck.afp.com": "Center",
+    "fullfact.org": "Center",
+    "leadstories.com": "Center",
+    "science.feedback.org": "Center",
+    "africacheck.org": "Center",
+    "boomlive.in": "Center",
+    "firstcheck.in": "Center",
+    "thip.media": "Center",
+    "livescience.com": "Center",
+    # Other outlets surfaced by the external pull
+    "rollcall.com": "Center",
+    "ajc.com": "Center",
+    "realclearpolitics.com": "Center-Right",
+    "mlive.com": "Center-Left",
     # Center-Left
     "inquirer.com": "Center-Left",
     "npr.org": "Center-Left",
@@ -64,8 +85,10 @@ IDEOLOGY_MAP = {
     "scientificamerican.com": "Center-Left",
     "theverge.com": "Center-Left",
     "wired.com": "Center-Left",
+    "theatlantic.com": "Center-Left",
     # Left
     "nytimes.com": "Left",
+    "rollingstone.com": "Left",
     "cnn.com": "Left",
     "washingtonpost.com": "Left",
     "msnbc.com": "Left",

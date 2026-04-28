@@ -6,9 +6,56 @@ Future work, not yet scoped or scheduled. For what's shipped, see `CLAUDE.md` (p
 
 Stages 1–5 of the original cross-reference spec are shipped (`article_classifier.py`, `claim_extractor.py`, `stage3_filter.py`, `claim_normalizer.py`, `stage4a_retrieval.py`, `stage4b_verify.py`, `stage5_report.py`). `stage5_report.py` regenerates `misinfo_carriers_by_article.csv` + `FINDINGS.md` from the Stage 4b verdicts. What's still open:
 
-- **Claim extraction test set.** The 6 original True-verdict articles were called out as a natural starter set for evaluating Stage 2 prompt quality; no test set / regression harness exists yet.
-- **Stage 3.5 normalizer chunking.** `claim_normalizer.py` makes one big LLM call to cluster all claims. At ≥150 input claims with `num_ctx=8192`, qwen3 sometimes returns prose instead of JSON. Proper fix is batching ~40 claims per call and merging family clusters by fuzzy matching canonical claim texts. Stage 4a's fallback path masks the failure today.
+- **Claim extraction test set (Stage 2).** The 6 original True-verdict articles were called out as a natural starter set; no Stage 2 test set / regression harness exists yet. Stage 4b now has one (see "Stage 4b precision harness" below) — Stage 2 still doesn't.
+- ~~**Stage 3.5 normalizer chunking.**~~ Shipped. `claim_normalizer.py` now chunks the input into batches of `--chunk-size` (default 40), uses Ollama's `"think": false` toggle (qwen3 silently ignores the `/no_think` prompt directive), and merges families across batches by fuzzy-matching `canonical_claim` text. Per-batch parse failures degrade to singleton families. On a 198-claim run: 4 of 5 batches parse cleanly, ~143 global families. Stage 4a's fallback path is preserved as a safety net.
+- ~~**Apply `"think": false` to the other LLM stages.**~~ Shipped across all five LLM-using scripts (`article_classifier.py`, `claim_extractor.py`, `claim_normalizer.py`, `stage4b_verify.py`, `misinfo_detector.py`). Smoke test on Stage 1 showed ~0.7s/call vs the previous ~9s baseline (10×). Open: re-measure full-pipeline throughput after the next run, then drop `num_predict` from 1500 → ~400 on Stage 2/4b since the bumps are no longer load-bearing.
+- **Per-batch retry on parse failure.** Batch 1 of the 198-claim test failed to parse (24.9s vs 17-21s for the others — likely budget exhaustion). A single retry with `num_predict=2500` would catch most of these without changing the default. Currently the singleton-fallback masks it acceptably.
 - **Stage 4b UNKNOWN rate (lower priority).** Post-recovery rate is 0.4% (9/2,147) on the current corpus — already well under the original 5% target. The open work is only about eliminating the manual re-run step; carrier yield is not being hurt.
+
+### External fact-check seed (recall lever) — **VALIDATED**
+
+`pipeline/external_factchecks.py` pulls debunked-claim records from the Google Fact Check Tools API (which aggregates ClaimReview-marked content from publishers worldwide), filters to women's-health and to "false/misleading"-style verdicts, dedupes against in-corpus URLs, and emits a `claims.json`-shaped file. Stage 3 accepts `--extra-input <path>` to union it in.
+
+**Validated end-to-end.** Default-query run pulled 211 raw API records → 54 women's-health-relevant after filtering and de-duplication. Outlet contributions: politifact (14), factcheck.afp.com (9), usatoday (8), snopes (5), apnews (5), factcheck.org (4) — exactly the fact-checkers MediaCloud doesn't surface. Stage 3 promoted 17 → 36 canonical sources after the initial merge; subsequent audit removed 11 false-positives (election politicians, symmetric pro-choice claims, ProPublica-as-attacked-target) → 25 final canonical sources. End-to-end downstream impact: previous run had 117 carrying verdicts / 65 articles; new run has 315 carrying verdicts / 136 articles after audit. Open follow-ups:
+
+- **Refutation body is shallow.** ClaimReview gives a textual rating ("False") but no refutation prose; the adapter writes `f"ClaimReview rating: {rating}"` as a placeholder. Stage 4b doesn't currently read the refutation, so this is fine for now — but if downstream features start using it, scrape the linked fact-check URL for the body.
+- **Topic-relevance filter is regex-only.** Reuses `WOMENS_HEALTH_RX` from `claim_normalizer.py`. Same caveats — false negatives if vocabulary lags. Could swap to semantic gate against the topic centroids.
+
+### Stage 4b precision harness (accuracy lever) — **VALIDATED**
+
+`pipeline/gold_set_build.py` + `pipeline/gold_set_eval.py` give a stratified labeling workflow against `stage4b_verdicts.json`. Build samples N pairs per verdict class (default 25, total 100); reviewer or cloud-LLM judge fills the verdict column; eval prints confusion matrix + per-class precision/recall/F1 + carrier FP/FN listings. `gold_set_eval.py` auto-detects `human_verdict` or `cloud_llm_verdict` column and supports `--judge-col` / `--llm-col` overrides. `pipeline/gold_set_reverify.py` provides a targeted reverification loop for testing prompt/model changes against the same labels.
+
+**100-row gold set labeled by Claude Opus 4.7 acting as judge.** Measured against qwen3:14b at temperature=0:
+- Overall accuracy: 90.0%
+- Carrier precision: **0.84** (4 false-positives in 25 stratified)
+- Carrier recall: **1.00** (no real carriers missed)
+- Per-class F1: carrying 0.913, debunking 0.962, neutral_reporting 0.844, irrelevant 0.877
+- 3 of 4 carrier FPs share the **quote-then-refute** pattern (article quotes the claim, refutes elsewhere; qwen3 misses the refutation)
+
+Open follow-ups:
+
+- **Re-label after material pipeline changes** (new claim families, new model) so precision can be tracked over time.
+- **Expand to ~400 rows** before benchmarking candidate replacement models. 25 carrying samples gives ±15% CI on precision — too wide to confidently distinguish 0.84 from 0.92 across model candidates.
+- **Build the same harness for Stage 2** (claim extraction quality). Same bones, different inputs (`claims.json` rows × per-claim `correct/wrong/missing` labels).
+- **Spot-check carrier flags from center/left outlets** (cbsnews 3, usatoday 1, nytimes 1, vox 1) — likely additional quote-then-refute false positives.
+
+### Stage 4b carrier-precision improvement attempts — both failed, see research doc
+
+Two prompt-engineering attempts to push the 0.84 carrier-precision ceiling **both regressed**:
+1. Stage 4b prompt rewrite ("scan whole article for refutation before classifying"): precision 0.84 → 0.50, recall 1.00 → 0.36. Reverted.
+2. Post-processing refutation-detection second pass (`pipeline/stage4b_refute_check.py`): hand-audit of 27 demotions found ~57% wrong (qwen3 routinely treated supportive citations as refutations). Reverted.
+
+Diagnosis: qwen3:14b cannot reliably distinguish "this paragraph supports the claim" vs "this paragraph refutes the claim" when both appear in the same article body. **The fix has to be a better model, not a better prompt.** Full analysis: `docs/local_llm_accuracy_research.md`. The research project will benchmark candidate replacement models (Phi-4-reasoning, gpt-oss-safeguard-20b, Gemma 3 12B, etc.) against the existing gold set.
+
+### Stage 4b structural-output enforcement — **SHIPPED**
+
+Both `pipeline/claim_normalizer.py` (Stage 3.5) and `pipeline/stage4b_verify.py` (Stage 4b) now pass an Ollama JSON Schema as the `format` parameter. Token-level grammar-constrained generation guarantees the response parses as valid JSON matching the schema; Stage 4b's `verdict` field is constrained to the four-value `enum`. Eliminates the prose-summary regression mode (Stage 3.5) and structurally impossible to return invalid verdict strings (Stage 4b).
+
+### Stage 4b evidence_quote hallucination — **SHIPPED + retroactively cleaned**
+
+Audit on the 315 carrying verdicts found 91 (29%) had `evidence_quote` values that were not literal substrings of the article body — 66 pure paraphrases, 25 stitched abridgments. `quote_in_article()` validator added to `pipeline/stage4b_verify.py` auto-nulls hallucinations on future runs. `pipeline/stage4b_quote_reextract.py` ran a one-shot retroactive cleanup with a strict-literal prompt + the validator + 1 retry: 79/91 (87%) recovered as verifiable literal quotes, 12/91 (13%) honestly nulled. Post-cleanup hallucination rate: 0%.
+
+Open follow-up: bake the strict-literal prompt into the main `verify()` so quotes are correct at generation time instead of post-hoc validated. Smoke test (5/5 clean on first attempt) suggests this would work without regression risk.
 
 ## Scraper: Cloudflare-tier bypass
 

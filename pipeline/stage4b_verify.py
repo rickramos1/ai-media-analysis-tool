@@ -14,6 +14,7 @@ Output: stage4b_verdicts.json (per-pair verdicts) and misinfo_carriers.csv
 import csv
 import json
 import os
+import re
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,6 +40,43 @@ OUTPUT_JSON = "data/stage4b_verdicts.json"
 CARRIERS_CSV = "data/misinfo_carriers.csv"
 SIM_THRESHOLD = float(os.environ.get("STAGE4B_SIM", "0.68"))
 VALID_VERDICTS = {"carrying", "debunking", "neutral_reporting", "irrelevant"}
+
+VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {
+            "type": "string",
+            "enum": ["carrying", "debunking", "neutral_reporting", "irrelevant"],
+        },
+        "evidence_quote": {"type": ["string", "null"]},
+        "reasoning": {"type": "string"},
+    },
+    "required": ["verdict", "evidence_quote", "reasoning"],
+}
+
+
+def _normalize_for_match(s):
+    """Collapse whitespace + normalize unicode quotes/dashes for substring matching."""
+    if not s:
+        return ""
+    s = (s.replace("‘", "'").replace("’", "'")
+          .replace("“", '"').replace("”", '"')
+          .replace("—", "-").replace("–", "-")
+          .replace("…", "..."))
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def quote_in_article(quote, article_text, min_len=12):
+    """Returns True if the LLM's evidence_quote appears as a substring of the
+    article body (after whitespace + smart-quote normalization). Quotes shorter
+    than `min_len` chars are treated as too short to validate (avoid false positives
+    on common phrases) and accepted by default."""
+    if not quote:
+        return True  # null quote is fine — not a hallucination
+    q = _normalize_for_match(quote)
+    if len(q) < min_len:
+        return True
+    return q in _normalize_for_match(article_text)
 
 PROMPT_TEMPLATE = """/no_think
 You are determining how a news article handles a specific claim that has been previously debunked by fact-checkers.
@@ -94,6 +132,16 @@ def verify(claim, article_title, article_outlet, article_text, max_retries=3):
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        # Ollama's native reasoning toggle. The `/no_think` prompt directive
+        # is silently ignored by qwen3:14b; without `think: false` the model
+        # burns the entire num_predict budget on a <think> block and returns
+        # an empty response (root cause of the documented UNKNOWN parse-fail
+        # rate that num_predict=1500 was bumped to compensate for).
+        "think": False,
+        # Schema-constrained generation (Ollama 0.5+). Token-level masking
+        # guarantees the response parses as JSON matching VERDICT_SCHEMA and
+        # that `verdict` is one of the four allowed enum values.
+        "format": VERDICT_SCHEMA,
         "options": {"temperature": 0, "num_predict": 1500, "num_ctx": 8192},
     }).encode("utf-8")
 
@@ -113,9 +161,15 @@ def verify(claim, article_title, article_outlet, article_text, max_retries=3):
             verdict = str(parsed.get("verdict", "")).strip().lower()
             if verdict not in VALID_VERDICTS:
                 continue
+            # Post-hoc evidence_quote validation. If the LLM hallucinated a
+            # quote that isn't in the article body, null it out and flag.
+            # See docs/improving_Stage_4b_arrier_verification.md §C.4.1.
+            evidence_quote = parsed.get("evidence_quote")
+            quote_validated = quote_in_article(evidence_quote, article_text)
             return {
                 "verdict": verdict,
-                "evidence_quote": parsed.get("evidence_quote"),
+                "evidence_quote": evidence_quote if quote_validated else None,
+                "evidence_quote_hallucinated": (not quote_validated and bool(evidence_quote)),
                 "reasoning": str(parsed.get("reasoning", "")).strip(),
             }
         except Exception:

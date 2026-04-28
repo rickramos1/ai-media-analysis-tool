@@ -160,6 +160,11 @@ def call_llm(topic, text, max_retries=3):
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        # Ollama's native reasoning toggle. The `/no_think` prompt directive
+        # is silently ignored by qwen3:14b; without `think: false` the model
+        # burns the entire num_predict budget on a <think> block and returns
+        # an empty response.
+        "think": False,
         "options": {
             "temperature": 0,
             "num_predict": 800,
