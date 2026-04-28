@@ -18,11 +18,12 @@ The pipeline is built around a "best-data" / zero-hallucination posture — `tem
 
 ## Setup
 
+Tested on Linux (Ubuntu). Windows isn't supported.
+
 ```bash
 # Create virtual environment
 python -m venv .venv
-.venv/Scripts/activate  # Windows
-# source .venv/bin/activate  # macOS/Linux
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -30,42 +31,24 @@ pip install -r requirements.txt
 # Install mediacloud from GitHub (if pip install fails)
 pip install git+https://github.com/mediacloud/api-client.git
 
-# Configure API key
-# Create a .env file with:
+# Configure
+# Create a .env file with at minimum:
 # MEDIACLOUD_API_KEY=your_key_here
 # OLLAMA_HOST=http://<your-ollama-host>:11434
 # OLLAMA_MODEL=qwen3:14b
+# OLLAMA_EMBED_MODEL=nomic-embed-text
 ```
 
 ### Ollama
 
-The pipeline uses Ollama for both `qwen3:14b` (classification, claim extraction, verification) and `nomic-embed-text` (Stage 4a vectorization).
-
-Install on the GPU host:
+The pipeline uses Ollama for both `qwen3:14b` (classification, claim extraction, verification) and `nomic-embed-text` (Stage 4a vectorization). Pull both on the GPU host:
 
 ```bash
 ollama pull qwen3:14b
 ollama pull nomic-embed-text
 ```
 
-To run Ollama on a different machine (recommended — the pipeline GPU is the bottleneck), set in `.env`:
-
-```bash
-OLLAMA_HOST=http://<remote-host>:11434
-OLLAMA_MODEL=qwen3:14b
-```
-
-The remote daemon must bind a non-loopback interface. Start it with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` and ensure port 11434 is reachable.
-
-VRAM math matters. On a 16 GB GPU running `qwen3:14b` (Q4_K_M, ~12 GB weights), the server's `OLLAMA_NUM_PARALLEL` and the client's per-request `num_ctx` interact:
-
-| `NUM_PARALLEL` | Per-slot KV at 16 k ctx | Total VRAM |
-|---|---|---|
-| 2 | 1.4 GB × 2 = 2.8 GB | 14.8 GB ✅ |
-| 4 | 1.4 GB × 4 = 5.6 GB | 17.6 GB ❌ (CPU spill) |
-| 4, with `num_ctx=8192` (default in pipeline) | 0.7 GB × 4 = 2.8 GB | 14.8 GB ✅ |
-
-The pipeline scripts default to `num_ctx=8192` so they coexist with `NUM_PARALLEL=4` without spilling.
+A single-machine setup (Ollama and pipeline on the same box) works fine. For a remote Ollama setup, VRAM-fit math, and recovery procedures, see [`docs/ollama_setup.md`](docs/ollama_setup.md).
 
 ## Pipeline
 

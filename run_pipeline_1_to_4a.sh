@@ -1,7 +1,13 @@
 #!/bin/bash
 set -e
-cd /home/rickramos1/projects/ai_media_analysis_tool
+cd "$(dirname "$0")"
 source .venv/bin/activate
+
+# Pick up OLLAMA_HOST + API keys from .env
+set -a
+[ -f .env ] && source .env
+set +a
+OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 
 echo "=============================================="
 echo "STAGE 0: preprocess CSV"
@@ -31,8 +37,8 @@ python -u pipeline/claim_normalizer.py
 echo "=============================================="
 echo "STAGE 4a: embedding retrieval"
 echo "=============================================="
-# Unload qwen3, load nomic-embed
-curl -s -X POST http://192.168.86.24:11434/api/generate -H 'Content-Type: application/json' -d '{"model":"qwen3:14b","keep_alive":0}' > /dev/null
+# Unload qwen3 from VRAM so nomic-embed-text can take its place
+curl -s -X POST "$OLLAMA_HOST/api/generate" -H 'Content-Type: application/json' -d '{"model":"qwen3:14b","keep_alive":0}' > /dev/null
 python -u pipeline/stage4a_retrieval.py
 
 echo "=============================================="
