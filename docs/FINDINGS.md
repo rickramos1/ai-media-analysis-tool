@@ -15,9 +15,23 @@ Output of the cross-reference misinformation detection pipeline run against a wo
 3. **Stage 2 — claim extraction** from the 45 FACT_CHECK articles: 154 debunked claims with named originators.
 4. **Stage 3 — ideology cross-reference**: promoted 16 claim-source groups to canonical (multi-ideology debunks or authoritative-solo outlets).
 5. **Stage 4a — embedding retrieval** with `nomic-embed-text`: 915 articles × 74 unique claim-texts, top-K candidates per article above cosine similarity 0.65.
-6. **Stage 4b — LLM verification** (`qwen3:14b`) at sim ≥ 0.68: 1,763 candidate pairs classified as `carrying`, `debunking`, `neutral_reporting`, or `irrelevant`.
+6. **Stage 4b — LLM verification** (`gpt-oss-safeguard:latest`) at sim ≥ 0.68: 1,763 candidate pairs classified as `carrying`, `debunking`, `neutral_reporting`, or `irrelevant`.
 
 **Posture**: temperature=0, allowed-abstention output, no LLM call without grounded prior fact-check evidence.
+
+## Validation
+
+The Stage 4b verifier (`gpt-oss-safeguard:latest`) was selected via a 5-model bake-off against a 100-row stratified gold set labeled by Claude Opus 4.7 acting as judge. The shipped model was then validated on a 377-row gold set covering all production carrier flags + 100 each of debunking/irrelevant + 87 neutral_reporting (cloud-judged):
+
+| Metric | Value | Note |
+|---|---|---|
+| Carrier precision | **0.978** | 88/90 flags confirmed; 95% Wilson CI ~0.92–0.997 (population-level) |
+| Carrier recall | 0.599 | 88/147 sampled real carriers caught (stratified-sample-biased) |
+| Overall accuracy | 0.751 | 4-class agreement with cloud judge |
+
+Operational meaning: **the carrier list above is approximately 65 real carriers + ~2 expected false positives** — high precision at the cost of missing roughly 40% of real carriers in the corpus. For a published list of named outlets this is the right bias: false positives damage credibility; missing some carriers is acceptable.
+
+Full bake-off and gold-set methodology in `docs/BACKLOG.md` ('Stage 4b precision harness' and 'Stage 4b carrier-precision improvement attempts' sections).
 
 ## Carrier outlets
 
@@ -217,7 +231,7 @@ Output of the cross-reference misinformation detection pipeline run against a wo
 
 - **Recall is bounded by the fact-check corpus.** We can only flag carriers of claims that some fact-checker in our corpus has already debunked. Novel misinfo not present in the fact-check set is invisible to this pipeline.
 - **Two campaigns dominate**: Heartbeat International and other anti-abortion organizations (18/90) and Ethics and Public Policy Center (17/90). The pipeline detects concentrated amplification, not diverse misinformation.
-- **Verifier is qwen3:14b at temperature 0.** The model can hallucinate evidence quotes — reviewers should always check the quote against the article text before publication.
+- **Verifier is `gpt-oss-safeguard:latest` at temperature 0.** Evidence quotes are validated as literal substrings of the article body (whitespace + smart-quote normalized) and nulled if the LLM hallucinates. Reviewers should still spot-check the quote against the article text before publishing the outlet name — at carrier precision 0.978, ~1–2 of every 90 flagged verdicts are expected false positives.
 - **6 candidate pairs returned UNKNOWN** after Stage 4b. Inspect in `data/stage4b_verdicts.json` if needed.
 
 ## Reviewer workflow
