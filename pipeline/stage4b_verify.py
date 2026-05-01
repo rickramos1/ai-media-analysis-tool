@@ -29,7 +29,13 @@ load_dotenv()
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 if not OLLAMA_HOST.startswith("http"):
     OLLAMA_HOST = f"http://{OLLAMA_HOST}"
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:14b")
+# Stage 4b uses a different model than the other LLM stages. The verifier
+# is the precision-critical step — every flagged carrier becomes a published
+# finding — so we use a model purpose-built for safety/judgment classification.
+# gpt-oss-safeguard:latest scored 1.000 carrier precision on the 100-row gold
+# set vs qwen3:14b's 0.682 (bake-off 2026-05-01). The other LLM stages still
+# use qwen3 via OLLAMA_MODEL. Override Stage 4b specifically via STAGE4B_MODEL.
+STAGE4B_MODEL = os.environ.get("STAGE4B_MODEL", "gpt-oss-safeguard:latest")
 OLLAMA_PARALLEL = int(os.environ.get("OLLAMA_PARALLEL", "4"))
 
 csv.field_size_limit(2**30)
@@ -129,19 +135,20 @@ def verify(claim, article_title, article_outlet, article_text, max_retries=3):
         article_text=article_text,
     )
     payload = json.dumps({
-        "model": OLLAMA_MODEL,
+        "model": STAGE4B_MODEL,
         "prompt": prompt,
         "stream": False,
-        # Ollama's native reasoning toggle. The `/no_think` prompt directive
-        # is silently ignored by qwen3:14b; without `think: false` the model
-        # burns the entire num_predict budget on a <think> block and returns
-        # an empty response (root cause of the documented UNKNOWN parse-fail
-        # rate that num_predict=1500 was bumped to compensate for).
+        # Ollama's `think` flag is for thinking-style models (qwen3, phi4-reasoning).
+        # gpt-oss-safeguard ignores it. Setting False is harmless across models.
         "think": False,
-        # Schema-constrained generation (Ollama 0.5+). Token-level masking
-        # guarantees the response parses as JSON matching VERDICT_SCHEMA and
-        # that `verdict` is one of the four allowed enum values.
-        "format": VERDICT_SCHEMA,
+        # NOTE: format=VERDICT_SCHEMA is intentionally NOT set here.
+        # Ollama's GBNF grammar enforcement is incompatible with gpt-oss-safeguard's
+        # output format (the model emits 0 response-channel tokens when constrained).
+        # gpt-oss-safeguard reliably produces parseable JSON matching the implicit
+        # schema in the prompt — verified 0/100 parse failures on the gold set.
+        # The post-hoc enum check below replaces structural enforcement.
+        # If you swap STAGE4B_MODEL back to qwen3 or another schema-friendly model,
+        # consider re-enabling `"format": VERDICT_SCHEMA`.
         "options": {"temperature": 0, "num_predict": 1500, "num_ctx": 8192},
     }).encode("utf-8")
 

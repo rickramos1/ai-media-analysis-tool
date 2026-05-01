@@ -21,16 +21,13 @@ Stages 1–5 of the original cross-reference spec are shipped (`article_classifi
 - **Refutation body is shallow.** ClaimReview gives a textual rating ("False") but no refutation prose; the adapter writes `f"ClaimReview rating: {rating}"` as a placeholder. Stage 4b doesn't currently read the refutation, so this is fine for now — but if downstream features start using it, scrape the linked fact-check URL for the body.
 - **Topic-relevance filter is regex-only.** Reuses `WOMENS_HEALTH_RX` from `claim_normalizer.py`. Same caveats — false negatives if vocabulary lags. Could swap to semantic gate against the topic centroids.
 
-### Stage 4b precision harness (accuracy lever) — **VALIDATED**
+### Stage 4b precision harness (accuracy lever) — **VALIDATED + DROVE MODEL SWAP**
 
-`pipeline/gold_set_build.py` + `pipeline/gold_set_eval.py` give a stratified labeling workflow against `stage4b_verdicts.json`. Build samples N pairs per verdict class (default 25, total 100); reviewer or cloud-LLM judge fills the verdict column; eval prints confusion matrix + per-class precision/recall/F1 + carrier FP/FN listings. `gold_set_eval.py` auto-detects `human_verdict` or `cloud_llm_verdict` column and supports `--judge-col` / `--llm-col` overrides. `pipeline/gold_set_reverify.py` provides a targeted reverification loop for testing prompt/model changes against the same labels.
+`pipeline/gold_set_build.py` + `pipeline/gold_set_eval.py` give a stratified labeling workflow against `stage4b_verdicts.json`. Build samples N pairs per verdict class (default 25, total 100); reviewer or cloud-LLM judge fills the verdict column; eval prints confusion matrix + per-class precision/recall/F1 + carrier FP/FN listings. `pipeline/gold_set_cloud_label.py` automates the cloud-judge step via the Anthropic API (defaults to `claude-opus-4-7`, 12-way parallel, ~35s for 100 rows, ~$2-3 cost). `pipeline/gold_set_bakeoff.py` runs N candidate models against the gold set in turn and prints a comparison table — used for the 2026-05-01 model swap. `pipeline/gold_set_reverify.py` provides a targeted reverification loop for testing prompt changes on a single model.
 
-**100-row gold set labeled by Claude Opus 4.7 acting as judge.** Measured against qwen3:14b at temperature=0:
-- Overall accuracy: 90.0%
-- Carrier precision: **0.84** (4 false-positives in 25 stratified)
-- Carrier recall: **1.00** (no real carriers missed)
-- Per-class F1: carrying 0.913, debunking 0.962, neutral_reporting 0.844, irrelevant 0.877
-- 3 of 4 carrier FPs share the **quote-then-refute** pattern (article quotes the claim, refutes elsewhere; qwen3 misses the refutation)
+**Current state — `data/gold_set_labeled_v2.csv`** (rebuilt 2026-05-01, judged by claude-opus-4-7). The harness drove the swap from qwen3:14b to gpt-oss-safeguard:latest. Per-model numbers in the "Stage 4b carrier-precision improvement attempts" section above. Production pipeline (gpt-oss-safeguard) measured at **0.83 accuracy, 1.00 carrier precision, 0.54 carrier recall** on the gold set.
+
+**Historical baseline** (`data/gold_set_labeled.csv`, 2026-04-28, no longer reproducible) reported 90.0% / 0.84 / 1.00 with qwen3:14b + format=schema. Same model file + code today produces ~50-56% agreement with the recorded verdicts; most plausible cause is an Ollama internal change between then and now.
 
 Open follow-ups:
 
@@ -39,13 +36,40 @@ Open follow-ups:
 - **Build the same harness for Stage 2** (claim extraction quality). Same bones, different inputs (`claims.json` rows × per-claim `correct/wrong/missing` labels).
 - **Spot-check carrier flags from center/left outlets** (cbsnews 3, usatoday 1, nytimes 1, vox 1) — likely additional quote-then-refute false positives.
 
-### Stage 4b carrier-precision improvement attempts — both failed, see research doc
+### Stage 4b carrier-precision improvement attempts — resolved by model swap
 
-Two prompt-engineering attempts to push the 0.84 carrier-precision ceiling **both regressed**:
+Three prompt-engineering attempts on qwen3:14b all regressed:
 1. Stage 4b prompt rewrite ("scan whole article for refutation before classifying"): precision 0.84 → 0.50, recall 1.00 → 0.36. Reverted.
-2. Post-processing refutation-detection second pass (`pipeline/stage4b_refute_check.py`): hand-audit of 27 demotions found ~57% wrong (qwen3 routinely treated supportive citations as refutations). Reverted.
+2. Post-processing refutation-detection second pass (`pipeline/stage4b_refute_check.py`): hand-audit of 27 demotions found ~57% wrong. Reverted.
+3. Bake strict-literal evidence_quote prompt into main `verify()`: most of measured regression turned out to be drift, not prompt — but added ~5pp regression on top. Reverted.
 
-Diagnosis: qwen3:14b cannot reliably distinguish "this paragraph supports the claim" vs "this paragraph refutes the claim" when both appear in the same article body. **The fix has to be a better model, not a better prompt.** Full analysis: `docs/local_llm_accuracy_research.md`. The research project will benchmark candidate replacement models (Phi-4-reasoning, gpt-oss-safeguard-20b, Gemma 3 12B, etc.) against the existing gold set.
+Conclusion was right — **the fix has to be a better model, not a better prompt** — and the 2026-05-01 model bake-off found the right replacement. `pipeline/gold_set_bakeoff.py` ran 5 candidates against the rebuilt 100-row gold set:
+
+| Model | Accuracy | Carrier P | Carrier R | Carrier F1 |
+|---|---|---|---|---|
+| **gpt-oss-safeguard:latest** | **0.83** | **1.00** | 0.54 | **0.70** |
+| phi4:14b | 0.71 | 0.65 | 0.63 | 0.64 |
+| qwen3:14b (incumbent) | 0.64 | 0.68 | 0.63 | 0.65 |
+| phi4-reasoning | 0.58 | 0.56 | 0.38 | 0.45 |
+| gemma3:12b | 0.40 | 0.58 | 0.63 | 0.60 |
+
+gpt-oss-safeguard:latest **shipped as Stage 4b's verifier** (env var `STAGE4B_MODEL` in `pipeline/stage4b_verify.py`). Other LLM stages still use qwen3 via `OLLAMA_MODEL`. **Implementation note**: the model is incompatible with Ollama's `format=schema` enforcement (zero response tokens when GBNF grammar is applied) — Stage 4b omits the format field and relies on the model's reliable native JSON output (0/100 parse failures on the gold set) plus post-hoc enum + quote validation.
+
+Operational tradeoff: the carrier list is shorter (full Stage 4b run produced 90 verdicts / 67 articles vs qwen3's 198 / 138 on the same Stage 4a candidates) but every flag is reliable. Recall ~0.54 means ~46% of real carriers in the corpus are missed; for published findings, conservative (high-precision) is the right bias.
+
+### Gold-set baseline drift — quantified, gold set rebuilt
+
+The original 100-row gold set (`data/gold_set_labeled.csv`, 2026-04-28) was built against `stage4b_verdicts.json` and reported 90.0% overall accuracy, 0.84 carrier precision, 1.00 carrier recall. Despite the verdicts file remaining 95.5% unchanged on disk, fresh `verify()` calls on the same inputs began producing only ~50-56% agreement with the recorded verdicts (regardless of `think on/off`, `format=schema on/off`, `num_predict 600/1500/4000`).
+
+The qwen3:14b model file on bigdoggie has mtime 2026-03-01 (well before the gold-set run) and is loaded fully on GPU at 14.9 GB VRAM. Ollama is at 0.17.1. Plausible drift causes — Ollama internal change (sampler/batching/KV-cache), some bigdoggie-side configuration change — are not bisectable from this side without version pins we don't have.
+
+**Resolved by full rebuild** (2026-05-01):
+1. ✅ Re-ran the full pipeline (Stage 0 → Stage 4b) end-to-end on the current corpus. New `stage4b_verdicts.json`: 1,763 verdicts (vs prior 3,220), 198 carriers across 138 articles (vs prior 315/136). Carrier overlap with prior run: only 77 articles (45% churn) — same model + similar inputs, materially different outputs.
+2. ✅ Built fresh gold-set template (`data/gold_set_template_v2.csv`) sampling from new verdicts.
+3. ✅ Re-judged with claude-opus-4-7 via `pipeline/gold_set_cloud_label.py` → `data/gold_set_labeled_v2.csv`.
+4. ✅ Re-measured: **overall accuracy 65.0%, carrier precision 0.64, carrier recall 0.67** (vs historical 90% / 0.84 / 1.00).
+
+The 0.64/0.67 numbers are the real current performance. The gold set is now ready for benchmarking candidate replacement models (see `docs/local_llm_accuracy_research.md`).
 
 ### Stage 4b structural-output enforcement — **SHIPPED**
 
@@ -55,7 +79,7 @@ Both `pipeline/claim_normalizer.py` (Stage 3.5) and `pipeline/stage4b_verify.py`
 
 Audit on the 315 carrying verdicts found 91 (29%) had `evidence_quote` values that were not literal substrings of the article body — 66 pure paraphrases, 25 stitched abridgments. `quote_in_article()` validator added to `pipeline/stage4b_verify.py` auto-nulls hallucinations on future runs. `pipeline/stage4b_quote_reextract.py` ran a one-shot retroactive cleanup with a strict-literal prompt + the validator + 1 retry: 79/91 (87%) recovered as verifiable literal quotes, 12/91 (13%) honestly nulled. Post-cleanup hallucination rate: 0%.
 
-Open follow-up: bake the strict-literal prompt into the main `verify()` so quotes are correct at generation time instead of post-hoc validated. Smoke test (5/5 clean on first attempt) suggests this would work without regression risk.
+Attempt to bake the strict-literal prompt into the main `verify()` (so quotes would be correct at generation time) regressed verdict accuracy 92% → 44% on the gold set — see "Stage 4b carrier-precision improvement attempts" below for details. Reverted. The post-hoc validator + retroactive reextract remain the right approach.
 
 ## Scraper: Cloudflare-tier bypass
 
