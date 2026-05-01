@@ -23,9 +23,13 @@ Stages 1–5 of the original cross-reference spec are shipped (`article_classifi
 
 ### Stage 4b precision harness (accuracy lever) — **VALIDATED + DROVE MODEL SWAP**
 
-`pipeline/gold_set_build.py` + `pipeline/gold_set_eval.py` give a stratified labeling workflow against `stage4b_verdicts.json`. Build samples N pairs per verdict class (default 25, total 100); reviewer or cloud-LLM judge fills the verdict column; eval prints confusion matrix + per-class precision/recall/F1 + carrier FP/FN listings. `pipeline/gold_set_cloud_label.py` automates the cloud-judge step via the Anthropic API (defaults to `claude-opus-4-7`, 12-way parallel, ~35s for 100 rows, ~$2-3 cost). `pipeline/gold_set_bakeoff.py` runs N candidate models against the gold set in turn and prints a comparison table — used for the 2026-05-01 model swap. `pipeline/gold_set_reverify.py` provides a targeted reverification loop for testing prompt changes on a single model.
+`pipeline/gold_set_build.py` + `pipeline/gold_set_eval.py` give a stratified labeling workflow against `stage4b_verdicts.json`. Build samples N pairs per verdict class (default 25); reviewer or cloud-LLM judge fills the verdict column; eval prints confusion matrix + per-class precision/recall/F1 + carrier FP/FN listings. `pipeline/gold_set_cloud_label.py` automates the cloud-judge step via the Anthropic API (defaults to `claude-opus-4-7`, 12-way parallel, ~35s for 100 rows / ~155s for 377 rows, ~$2-10 cost). `pipeline/gold_set_bakeoff.py` runs N candidate models against the gold set in turn and prints a comparison table — used for the 2026-05-01 model swap. `pipeline/gold_set_reverify.py` provides a targeted reverification loop for testing prompt changes on a single model.
 
-**Current state — `data/gold_set_labeled_v2.csv`** (rebuilt 2026-05-01, judged by claude-opus-4-7). The harness drove the swap from qwen3:14b to gpt-oss-safeguard:latest. Per-model numbers in the "Stage 4b carrier-precision improvement attempts" section above. Production pipeline (gpt-oss-safeguard) measured at **0.83 accuracy, 1.00 carrier precision, 0.54 carrier recall** on the gold set.
+**Current gold sets**:
+- `data/gold_set_labeled_v2.csv` (100 rows, 25 per qwen3-class) — drove the model swap; bake-off ground truth.
+- `data/gold_set_labeled_v3.csv` (377 rows, all 90 safeguard carriers + 100 debunking + 87 neutral + 100 irrelevant) — production-verifier validation, full carrier population coverage.
+
+Production pipeline (gpt-oss-safeguard) measured on v3: **carrier precision 0.978 (95% CI ~0.92–0.997), recall 0.599, accuracy 0.751**. See "Stage 4b carrier-precision improvement attempts" above for the bake-off comparison and the operational tradeoff.
 
 **Historical baseline** (`data/gold_set_labeled.csv`, 2026-04-28, no longer reproducible) reported 90.0% / 0.84 / 1.00 with qwen3:14b + format=schema. Same model file + code today produces ~50-56% agreement with the recorded verdicts; most plausible cause is an Ollama internal change between then and now.
 
@@ -55,7 +59,13 @@ Conclusion was right — **the fix has to be a better model, not a better prompt
 
 gpt-oss-safeguard:latest **shipped as Stage 4b's verifier** (env var `STAGE4B_MODEL` in `pipeline/stage4b_verify.py`). Other LLM stages still use qwen3 via `OLLAMA_MODEL`. **Implementation note**: the model is incompatible with Ollama's `format=schema` enforcement (zero response tokens when GBNF grammar is applied) — Stage 4b omits the format field and relies on the model's reliable native JSON output (0/100 parse failures on the gold set) plus post-hoc enum + quote validation.
 
-Operational tradeoff: the carrier list is shorter (full Stage 4b run produced 90 verdicts / 67 articles vs qwen3's 198 / 138 on the same Stage 4a candidates) but every flag is reliable. Recall ~0.54 means ~46% of real carriers in the corpus are missed; for published findings, conservative (high-precision) is the right bias.
+**Validated on a 377-row gold set** (`data/gold_set_labeled_v3.csv`, all 90 production-carrier flags sampled + 100 each of debunking/irrelevant + 87 neutral_reporting):
+
+- Carrier precision: **0.978** (88/90 flags confirmed by cloud judge; 95% CI ~0.92–0.997). Population-level — every safeguard carrier flag was checked.
+- Carrier recall: 0.599 (88/147 sampled real carriers caught) — stratified-sample-biased since irrelevants were 100/1389 sampled.
+- Overall accuracy: 0.751.
+
+Operational tradeoff: the carrier list is shorter (full Stage 4b run produced 90 verdicts / 67 articles vs qwen3's 198 / 138 on the same Stage 4a candidates) but ~98% of flags are reliable. Production output ≈ **65 real carriers + 2 expected false positives**. Recall ~0.6 means ~40% of real carriers in the corpus are missed; for published findings, conservative (high-precision) is the right bias.
 
 ### Gold-set baseline drift — quantified, gold set rebuilt
 
