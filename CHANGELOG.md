@@ -12,9 +12,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 First public release. Local-LLM-based misinformation detection pipeline that
 flags articles "carrying" previously-debunked health claims — i.e., articles
 that present a fact-checked-false claim as true without acknowledging the
-debunking. Cloud-LLM-validated carrier precision **0.978** on a 377-row gold
-set; ~98% of flagged articles confirmed real carriers per a Claude Opus 4.7
-judge.
+debunking. Cloud-LLM-validated carrier precision **0.973** on a 641-row gold
+set with near-population coverage of the carrier class (180 of 185 evaluable
+production flags confirmed by a Claude Opus 4.7 judge).
 
 ### Pipeline
 
@@ -48,10 +48,12 @@ judge.
   - phi4-reasoning: 0.58 / 0.56 / 0.38
   - gemma3:12b: 0.40 / 0.58 / 0.625
 - gpt-oss-safeguard is incompatible with Ollama's `format=schema` enforcement (zero response tokens when GBNF grammar applied); Stage 4b drops the schema and relies on the model's native JSON + post-hoc enum validation (0/100 parse failures on the gold set).
-- Validated on a 377-row gold set covering all 90 production carrier flags + 100 each of debunking/irrelevant + 87 neutral_reporting:
-  - Carrier precision: **0.978** (88/90; 95% Wilson CI ~0.92–0.997, population-level)
-  - Carrier recall: 0.599 (88/147; sampled, stratification-biased)
-  - Overall accuracy: 0.751
+- Validated on a 641-row gold set covering all 187 production carrier flags + 134 debunking + 120 neutral_reporting (full population on these three classes) + 200 irrelevant:
+  - Carrier precision: **0.973** (180/185 evaluable; 95% Wilson CI ~0.94–0.99, near-population coverage)
+  - Carrier recall: 0.692 (180/260 sampled real carriers caught; stratification-biased on irrelevant)
+  - Overall accuracy: 0.778
+  - 11/641 rows hit Anthropic rate limits and were excluded from metrics (98.3% completion)
+- Carrier false-positive failure mode: 4/5 FPs were on left-leaning outlets where the article was *about* a piece of misinformation (i.e., debunking it) and the verifier flagged it as carrying the fact-checker's own statement. Pre-publication spot-check via `data/misinfo_carriers_spot_check.csv` is the right safeguard.
 - Other LLM stages (Stages 1, 2, 3.5) still use qwen3:14b via `OLLAMA_MODEL`; Stage 4b alone uses `STAGE4B_MODEL` (default `gpt-oss-safeguard:latest`).
 
 ### Quality safeguards

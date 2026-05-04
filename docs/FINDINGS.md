@@ -21,15 +21,17 @@ Output of the cross-reference misinformation detection pipeline run against a wo
 
 ## Validation
 
-The Stage 4b verifier (`gpt-oss-safeguard:latest`) was selected via a 5-model bake-off against a 100-row stratified gold set labeled by Claude Opus 4.7 acting as judge. The shipped model was then validated on a 377-row gold set covering all production carrier flags + 100 each of debunking/irrelevant + 87 neutral_reporting (cloud-judged):
+The Stage 4b verifier (`gpt-oss-safeguard:latest`) was selected via a 5-model bake-off against a 100-row stratified gold set labeled by Claude Opus 4.7 acting as judge. The shipped model was validated on a 641-row gold set covering all 187 production carrier flags + 134 debunking + 120 neutral_reporting (full population on three classes) + 200 irrelevant (cloud-judged):
 
 | Metric | Value | Note |
 |---|---|---|
-| Carrier precision | **0.978** | 88/90 flags confirmed; 95% Wilson CI ~0.92–0.997 (population-level) |
-| Carrier recall | 0.599 | 88/147 sampled real carriers caught (stratified-sample-biased) |
-| Overall accuracy | 0.751 | 4-class agreement with cloud judge |
+| Carrier precision | **0.973** | 180/185 flags confirmed; 95% Wilson CI ~0.94–0.99 (near-population coverage) |
+| Carrier recall | 0.692 | 180/260 sampled real carriers caught (stratification-biased on irrelevant) |
+| Overall accuracy | 0.778 | 4-class agreement with cloud judge |
 
-Operational meaning: **the carrier list above is approximately 65 real carriers + ~2 expected false positives** — high precision at the cost of missing roughly 40% of real carriers in the corpus. For a published list of named outlets this is the right bias: false positives damage credibility; missing some carriers is acceptable.
+Operational meaning: **the carrier list above is approximately 182 real carriers + ~5 expected false positives** — high precision at the cost of missing roughly 30% of real carriers in the corpus. For a published list of named outlets this is the right bias: false positives damage credibility; missing some carriers is acceptable.
+
+**Known failure mode**: 4/5 carrier false positives in v4 validation occurred on left-leaning outlets where the article was *about* a piece of misinformation (i.e., debunking it) and the verifier flagged the article as carrying the fact-checker's own statement. Pre-publication spot-check via `data/misinfo_carriers_spot_check.csv` is the right safeguard.
 
 Full bake-off and gold-set methodology in `docs/BACKLOG.md` ('Stage 4b precision harness' and 'Stage 4b carrier-precision improvement attempts' sections).
 
@@ -266,7 +268,7 @@ Full bake-off and gold-set methodology in `docs/BACKLOG.md` ('Stage 4b precision
 
 - **Recall is bounded by the fact-check corpus.** We can only flag carriers of claims that some fact-checker in our corpus has already debunked. Novel misinfo not present in the fact-check set is invisible to this pipeline.
 - **Two campaigns dominate**: Heartbeat International and other anti-abortion organizations (27/187) and Ethics and Public Policy Center (EPPC) (26/187). The pipeline detects concentrated amplification, not diverse misinformation.
-- **Verifier is `gpt-oss-safeguard:latest` at temperature 0.** Evidence quotes are validated as literal substrings of the article body (whitespace + smart-quote normalized) and nulled if the LLM hallucinates. Reviewers should still spot-check the quote against the article text before publishing the outlet name — at carrier precision 0.978, ~1–2 of every 90 flagged verdicts are expected false positives.
+- **Verifier is `gpt-oss-safeguard:latest` at temperature 0.** Evidence quotes are validated as literal substrings of the article body (whitespace + smart-quote normalized) and nulled if the LLM hallucinates. Reviewers should still spot-check the quote against the article text before publishing the outlet name — at carrier precision 0.973, ~3% of flagged verdicts are expected false positives, with a known skew toward left-leaning outlets where the article is *about* misinformation rather than carrying it.
 - **22 candidate pairs returned UNKNOWN** after Stage 4b. Inspect in `data/stage4b_verdicts.json` if needed.
 
 ## Reviewer workflow
