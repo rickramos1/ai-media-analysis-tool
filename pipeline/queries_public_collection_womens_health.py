@@ -58,8 +58,11 @@ TOPIC_QUERIES = {
 
 
 def run_womens_health_queries():
-    COLLECTION_IDS = [34412234]
-    START_DATE = date(2022, 6, 24)  # Roe v. Wade overturned
+    COLLECTION_IDS = [
+        34412234,    # US - National (248 sources)
+        8878332,     # Sexual and Reproductive Health and Rights (2,524 sources)
+    ]
+    START_DATE = date(2018, 6, 24)  # 4 yr pre-Roe-overturn for velocity comparison
     END_DATE = date.today()
     PAGE_SIZE = 100
     MAX_PAGES = 20  # raised from 10 — carrier queries are more specific so per-topic volume is lower

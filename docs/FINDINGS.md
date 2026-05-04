@@ -4,18 +4,18 @@ Output of the cross-reference misinformation detection pipeline run against a wo
 
 ## Summary
 
-- **90 carrying verdicts** flagged across **67 unique articles**.
+- **187 carrying verdicts** flagged across **135 unique articles**.
 - Each flagged article presents a previously-debunked claim as fact, without acknowledging the debunking.
 - Every flag carries provenance: the originating actor, the fact-check that debunked it, the specific passage in the article, and the LLM's reasoning.
 
 ## Methodology
 
-1. **Corpus** — 1,486 articles from MediaCloud, scraped with `trafilatura`. 988 passed eligibility (word count AND (regex topic-context gate OR semantic similarity ≥ 0.70) AND canonical-after-syndication-dedupe).
-2. **Stage 1 — article classification** (`qwen3:14b`): 915 ORIGINAL, 45 FACT_CHECK, 17 OTHER, 11 unclassified.
-3. **Stage 2 — claim extraction** from the 45 FACT_CHECK articles: 154 debunked claims with named originators.
-4. **Stage 3 — ideology cross-reference**: promoted 16 claim-source groups to canonical (multi-ideology debunks or authoritative-solo outlets).
-5. **Stage 4a — embedding retrieval** with `nomic-embed-text`: 915 articles × 74 unique claim-texts, top-K candidates per article above cosine similarity 0.65.
-6. **Stage 4b — LLM verification** (`gpt-oss-safeguard:latest`) at sim ≥ 0.68: 1,763 candidate pairs classified as `carrying`, `debunking`, `neutral_reporting`, or `irrelevant`.
+1. **Corpus** — 3,064 articles from MediaCloud, scraped with `trafilatura`. 1,751 passed eligibility (word count AND (regex topic-context gate OR semantic similarity ≥ 0.70) AND canonical-after-syndication-dedupe).
+2. **Stage 1 — article classification** (`qwen3:14b`): 1,576 ORIGINAL, 61 FACT_CHECK, 49 OTHER, 65 unclassified.
+3. **Stage 2 — claim extraction** from the 91 FACT_CHECK articles: 300 debunked claims with named originators.
+4. **Stage 3 — ideology cross-reference**: promoted 38 claim-source groups to canonical (multi-ideology debunks or authoritative-solo outlets).
+5. **Stage 4a — embedding retrieval** with `nomic-embed-text`: 1,576 articles × 111 unique claim-texts, top-K candidates per article above cosine similarity 0.65.
+6. **Stage 4b — LLM verification** (`gpt-oss-safeguard:latest`) at sim ≥ 0.68: 2,917 candidate pairs classified as `carrying`, `debunking`, `neutral_reporting`, or `irrelevant`.
 
 **Posture**: temperature=0, allowed-abstention output, no LLM call without grounded prior fact-check evidence.
 
@@ -37,117 +37,196 @@ Full bake-off and gold-set methodology in `docs/BACKLOG.md` ('Stage 4b precision
 
 | Outlet | Carrier verdicts | Unique articles |
 |---|---:|---:|
-| ncregister.com | 17 | 11 |
-| dailysignal.com | 13 | 9 |
-| townhall.com | 9 | 8 |
-| breitbart.com | 5 | 5 |
-| pjmedia.com | 5 | 3 |
-| foxnews.com | 5 | 3 |
-| slate.com | 4 | 3 |
-| redstate.com | 4 | 3 |
-| dailycaller.com | 4 | 3 |
-| spectator.org | 4 | 3 |
-| nypost.com | 4 | 2 |
-| jezebel.com | 3 | 3 |
-| latimes.com | 2 | 1 |
-| dailykos.com | 2 | 1 |
+| lifesitenews.com | 65 | 40 |
+| lifenews.com | 23 | 13 |
+| dailysignal.com | 12 | 7 |
+| ncregister.com | 9 | 7 |
+| benzinga.com | 6 | 6 |
+| foxnews.com | 6 | 3 |
+| msmagazine.com | 4 | 4 |
+| townhall.com | 3 | 3 |
+| jezebel.com | 3 | 2 |
+| vox.com | 2 | 2 |
+| pjmedia.com | 2 | 2 |
+| breitbart.com | 2 | 2 |
+| bustle.com | 2 | 2 |
+| slate.com | 2 | 2 |
+| operationrescue.org | 2 | 2 |
+| spectator.org | 2 | 2 |
+| yahoo.com | 2 | 2 |
+| talkingpointsmemo.com | 2 | 2 |
+| huffpost.com | 2 | 2 |
+| newstatesman.com | 2 | 1 |
+| cnn.com | 2 | 1 |
+| azcentral.com | 2 | 1 |
+| motherjones.com | 2 | 1 |
+| dailycaller.com | 2 | 1 |
+| autostraddle.com | 2 | 1 |
+| livescience.com | 1 | 1 |
+| blackchronicle.com | 1 | 1 |
+| hollywoodreporter.com | 1 | 1 |
 | theconversation.com | 1 | 1 |
+| jsonline.com | 1 | 1 |
+| npr.org | 1 | 1 |
+| usatoday.com | 1 | 1 |
+| realclearpolitics.com | 1 | 1 |
+| nationalmemo.com | 1 | 1 |
+| businessinsider.com | 1 | 1 |
+| nypost.com | 1 | 1 |
+| vice.com | 1 | 1 |
+| blackdoctor.org | 1 | 1 |
+| theweek.com | 1 | 1 |
+| newsbusters.org | 1 | 1 |
 | thenation.com | 1 | 1 |
-| motherjones.com | 1 | 1 |
-| rawstory.com | 1 | 1 |
-| gazettenet.com | 1 | 1 |
-| vox.com | 1 | 1 |
-| upi.com | 1 | 1 |
-| huffpost.com | 1 | 1 |
-| oregonlive.com | 1 | 1 |
+| mediamatters.org | 1 | 1 |
+| secularprolife.org | 1 | 1 |
+| buzzfeed.com | 1 | 1 |
+| newsone.com | 1 | 1 |
+| dailykos.com | 1 | 1 |
+| salon.com | 1 | 1 |
+| madamenoire.com | 1 | 1 |
+| theguardian.com | 1 | 1 |
 
 ## Campaigns being amplified
 
 | Originating actor | Carrier verdicts | Description |
 |---|---:|---|
-| Heartbeat International and other anti-abortion organizations | 18 | Abortion pill reversal can help women halt medical abortions. |
-| Ethics and Public Policy Center | 17 | The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.' |
-| Abortion Pill Reversal and other anti-choice organizations; Anti-abortion advocates and organizations such as Abortion Pill Reversal; Anti-choice advocates and crisis pregnancy centers; Heartbeat Inte | 8 | There is an antidote to the abortion pill — you can reverse it with progesterone. |
-| Heartbeat International and other CPCs | 7 | Crisis pregnancy centers (CPCs) provide accurate and unbiased information about reproductive health care. |
-| Abortion Pill Reversal and other anti-choice organizations; Heartbeat International and 11 crisis pregnancy centers affiliated with the nonp; Heartbeat International and other anti-abortion activists | 6 | Abortion pill reversal can be used to reverse a medication abortion by taking large amounts of progesterone and not taking the misoprostol pills. |
-| Planned Parenthood | 6 | The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra.' |
-| Ethics & Public Policy Center | 4 | One in 10 women experience a serious adverse event when using mifepristone to end a pregnancy. |
-| Pro-abortion groups | 4 | Chemical abortion drugs are a 'safe and convenient' option for women. |
-| Anti-choice advocates and crisis pregnancy centers; Heartbeat International; Heartbeat International and 11 crisis pregnancy centers affiliated with the nonp; Heartbeat International and anti-abortion | 3 | The 'abortion pill reversal' procedure is safe and effective. |
+| Heartbeat International and other anti-abortion organizations | 27 | Abortion pill reversal can help women halt medical abortions. |
+| Ethics and Public Policy Center (EPPC) | 26 | The EPPC report provides objective safety data showing that medication abortion is unsafe. |
+| Heartbeat International and other anti-abortion activists | 25 | Abortion pill reversal can be used to reverse a medication abortion by taking large amounts of progesterone and not taking the misoprostol pills. |
+| (unknown); Brett Kavanaugh; Jacob Rees-Mogg; Judge Brett Kavanaugh; Kanye West; Pill Club's survey respondents (men in the U.S.); Priests for Life; U.S. government (via USAID); null | 12 | Emergency contraception such as Plan B is an abortifacient and can induce abortion. |
+| Jane’s Army | 10 | The anti-choice movement opposes reproductive health care and seeks to ban birth control and abortion. |
+| Abortion Pill Reversal and other anti-choice organizations; Anti-abortion advocates and organizations such as Abortion Pill Reversal; Anti-abortion groups and state legislatures; George Delgado (pro-l | 8 | Progesterone can be used to reverse the effects of the abortion pill (mifepristone). |
+| Ethics and Public Policy Center | 7 | The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.' |
+| Goop | 7 | A supplement for menopausal women is formulated with botanicals that support hormonal balance. |
+| Alternatives Pregnancy Center; Anti-choice advocates and crisis pregnancy centers; George Delgado; George Delgado and co-authors; Heartbeat International; Heartbeat International and 11 crisis pregnan | 6 | The 'abortion pill reversal' procedure is safe and effective. |
+| Heartbeat International and other CPCs | 6 | Crisis pregnancy centers (CPCs) provide accurate and unbiased information about reproductive health care. |
+| (unknown); A 2020 open letter from a coalition of pro-life groups; April analysis from EPPC; Charlotte Lozier Institute study; EPPC report; Ethics & Public Policy Center (EPPC); November 2021 study by | 5 | Serious adverse events from medication abortion are common. |
+| Ms. Magazine | 5 | IUD insertion can be painful, but pain management options are available. |
+| ILIA CALDERÓN, UNIVISION ANCHOR | 4 | The Supreme Court ruled that faith-based pregnancy centers are not compelled to inform women about family planning services, including abortion. |
+| Planned Parenthood | 4 | The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra'. |
+| Foundation Consumer Healthcare and Planned Parenthood | 4 | Emergency contraception like Plan B is not an abortion pill and does not harm an existing pregnancy. |
+| SBA Pro-Life | 3 | This tragedy began with abortion drugs. |
+| Elon Musk; Influencers on TikTok; Students for Life; Wellness influencers on TikTok | 3 | Hormonal birth control causes a wide range of serious health issues, including infertility, depression, acne, weight gain, and decreased libido. |
 | Pro-abortion activists and their media proxies such as NPR, Reuters, the New Yor | 3 | Unrestricted abortion access is necessary for providing life-saving care for pregnant women. |
-| Danco Laboratories | 2 | Mifepristone abortion is safe and effective. |
-| Mylissa Farmer, as reported by The Springfield News-Leader | 2 | Mylissa Farmer was unable to receive an abortion in Missouri and had to travel out of state for the procedure. |
-| American College of Obstetricians and Gynecologists (ACOG) | 1 | Claims regarding abortion 'reversal' treatment are not based on science and do not meet clinical standards. |
-| ProPublica | 1 | ProPublica's story on Amber Thurman implies that doctors waited so long because of the state’s abortion laws. |
-| Mike Johnson | 1 | The morning after pill, as we know, is an abortifacient. |
-| Students for Life | 1 | Hormonal birth control causes abortions and causes problems like infertility |
-| Missouri Republican bill sponsor | 1 | Anything that destroys that life is abortion, it’s not birth control. |
-| Media and some doctors | 1 | Pro-life laws prevent physicians from treating ectopic pregnancies, miscarriages, or women suffering life-threatening complications, including complications from abortion. |
-| (unknown) | 1 | Home remedies for abortion are safe. |
-| Elon Musk | 1 | Hormonal birth control makes you fat, doubles risk of depression & triples risk of suicide |
-| Influencers on social media | 1 | Hormonal contraception can be responsible for bad romantic decisions because you are 'attracted to different men than you would be if you were off the pill' |
+| Influencers; Ms. Magazine; Natural Cycles; Self-described 'hormone experts' on TikTok; TikToker | 3 | Fertility awareness methods are as effective as or more effective than hormonal birth control. |
+| Ethics & Public Policy Center | 2 | One in 10 women experience a serious adverse event when using mifepristone to end a pregnancy. |
+| Carrie N. Baker | 2 | The two medications used for abortion—mifepristone and misoprostol—are 97.4 percent effective and safer than Tylenol |
+| Media and some doctors | 2 | Pro-life laws prevent physicians from treating ectopic pregnancies, miscarriages, or women suffering life-threatening complications, including complications from abortion. |
+| Pro-abortion groups | 2 | Chemical abortion drugs are a 'safe and convenient' option for women. |
+| American College of Obstetricians and Gynecologists (ACOG) | 2 | Claims regarding abortion 'reversal' treatment are not based on science and do not meet clinical standards. |
+| Colorado Gov. Jared Polis | 2 | Project 2025 'puts limits on contraception' and 'threatens access to IVF.' |
+| Letitia James, New York Attorney General | 1 | There is 'no credible evidence' to prove that abortion-pill reversal is either safe or effective. |
+| Liberty Counsel Action | 1 | Chemical abortion drugs and human remains are contaminating waterways due to improper disposal by women. |
+| SATCHA PRETTO, UNIVISION ANCHOR | 1 | The Supreme Court ruled against a California law that ordered health centers to inform patients about pathways to access low-cost or free procedures for birth control or for the termination of a pregnancy. |
+| Media outlets, medical associations, and politicians | 1 | Abortion restrictions would make receiving medical care for ectopic pregnancies and miscarriages illegal, and people will die. |
+| Danco Laboratories | 1 | Mifepristone abortion is safe and effective. |
 | U.S. Agency for International Development (USAID) | 1 | The contraceptives destroyed by the Trump administration 'induced abortion.' |
+| Alice Huling, Campaign for Accountability | 1 | Google allows crisis pregnancy centers to spread misleading information about contraception. |
 
 ## Top flagged articles (by similarity)
 
-### [nypost.com] One in 10 chemical abortions end in serious health complications: report
+### [newstatesman.com] Why so many American women are ordering abortion pills online
 
-- **URL**: https://nypost.com/2025/04/28/us-news/one-in-10-chemical-abortions-end-in-serious-health-complications-report/
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **Evidence quote from article**: 'Nearly 11% of women who have taken a chemical abortion pill in recent years have experienced a serious adverse health event — such as infection, hemorrhage or sepsis — according to a report from a conservative group that reviewed insurance claims data.'
-- **LLM reasoning**: The article presents the 1‑in‑10 serious‑adverse‑event statistic as a factual finding from a report, without providing counter‑evidence or a balanced perspective.
-
-### [breitbart.com] Shocking Data Suggests Abortion Pill Injuries 22 Times Higher Than Reported
-
-- **URL**: https://www.breitbart.com/politics/2025/04/28/exclusive-shocking-data-suggests-abortion-pill-complications-22-times-higher-than-previously-reported-fda-must-reinstate-stronger-safeguards/
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **LLM reasoning**: The article repeats the Ethics and Public Policy Center’s claim that 1 in 10 women experience serious adverse events without providing counter‑evidence or a balanced perspective, presenting it as fact.
-
-### [slate.com] If the “Abortion Pill” Gets Banned, There’s Still One Good Move
-
-- **URL**: https://slate.com/news-and-politics/2023/02/abortion-pill-ban-texas-mifepristone-misoprostol.html?via=rss
-- **Carries claim**: The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra.'
+- **URL**: https://www.newstatesman.com/world/north-america/2019/05/why-so-many-american-women-are-ordering-abortion-pills-online
+- **Carries claim**: The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra'.
 - **Originated by**: Planned Parenthood
 - **Debunked by**: breitbart.com
-- **Evidence quote from article**: 'decades of research and several million abortions with mifepristone—including more than 3.7 million in the U.S.—have shown the drug to be safer than Tylenol'
-- **LLM reasoning**: The article repeats the safety claim about mifepristone being safer than Tylenol without refuting it, presenting it as a fact.
+- **Evidence quote from article**: 'Overall, the risk of complications is extremely low: according to the US FDA only 2 in every thousand women experience an adverse reaction to mifepristone – making it significantly safer than other widely-used drugs, such as Tylenol (known as Ibuprofen in the UK) or Viagra.'
+- **LLM reasoning**: The article presents the claim that mifepristone is safer than Tylenol and Viagra as a factual statement without providing any counter‑evidence or refutation.
 
-### [redstate.com] If the Death Merchants Have Their way, Abortion Pill Reversal Will Become the Next Battleground
+### [cnn.com] What is mifepristone?
 
-- **URL**: https://redstate.com/jenniferoo/2024/05/06/if-the-left-has-its-way-abortion-pill-reversal-will-become-the-next-battleground-n2173807
+- **URL**: https://www.cnn.com/mifepristone-abortion-pill-explained
+- **Carries claim**: The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra'.
+- **Originated by**: Planned Parenthood
+- **Debunked by**: breitbart.com
+- **Evidence quote from article**: 'Data analyzed by CNN shows that mifepristone is even safer than some of the most common prescription medications. The risk of death from penicillin, an antibiotic used to treat bacterial infections like pneumonia, for example, is four times greater than it is for mifepristone. The risk of death after taking Viagra – used to treat erectile dysfunction – is nearly 10 times higher.'
+- **LLM reasoning**: The article repeats the safety comparison claim uncritically, presenting it as fact with supporting data.
+
+### [benzinga.com] Menosoothe Under Review: Youth Hormone Supplement for Women with Exotic Breakfast Drink for Menopausal Relief
+
+- **URL**: https://www.benzinga.com/pressreleases/25/04/g44991251/menosoothe-under-review-youth-hormone-supplement-for-women-with-exotic-breakfast-drink-for-menopau
+- **Carries claim**: A supplement for menopausal women is formulated with botanicals that support hormonal balance.
+- **Originated by**: Goop
+- **Debunked by**: businessinsider.com
+- **LLM reasoning**: The article presents the claim that the supplement is formulated with botanicals to support hormonal balance as a factual, promotional statement without any counter‑evidence or skepticism.
+
+### [benzinga.com] Best Supplements for Menopause Ranked: WellMe MenoRescue for Women's Hormonal Health
+
+- **URL**: https://www.benzinga.com/pressreleases/25/04/g44986686/best-supplements-for-menopause-ranked-wellme-menorescue-for-womens-hormonal-health
+- **Carries claim**: A supplement for menopausal women is formulated with botanicals that support hormonal balance.
+- **Originated by**: Goop
+- **Debunked by**: businessinsider.com
+- **LLM reasoning**: The article presents the claim that the supplement is formulated with botanicals to support hormonal balance as a factual endorsement of the product.
+
+### [lifenews.com] Letitia James Just Lost a Huge Battle to Stop Pregnancy Centers from Saving Babies
+
+- **URL**: https://www.lifenews.com/2025/12/03/letitia-james-just-lost-a-huge-battle-to-stop-pregnancy-centers-from-saving-babies/
+- **Carries claim**: Abortion pill reversal can be used to reverse a medication abortion by taking large amounts of progesterone and not taking the misoprostol pills.
+- **Originated by**: Heartbeat International and other anti-abortion activists
+- **Debunked by**: jezebel.com
+- **LLM reasoning**: The article presents the abortion‑pill reversal claim as a factual, effective procedure and praises it, without offering any counter‑evidence or skepticism.
+
+### [lifesitenews.com] Abortion pill injuries are massively underreported due to activists, complicit media: new report
+
+- **URL**: https://www.lifesitenews.com/news/abortion-pill-injuries-are-massively-underreported-due-to-activists-complicit-media-new-report/
+- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
+- **Originated by**: Ethics and Public Policy Center
+- **Debunked by**: cbsnews.com
+- **Evidence quote from article**: '"10.93 percent of women experience sepsis, infection, hemorrhaging, or another serious adverse event within 45 days following a mifepristone abortion," the EPPC found in a report.'
+- **LLM reasoning**: The article presents the EPPC claim as fact and uses it to support its narrative without offering any counter‑evidence or critique.
+
+### [lifesitenews.com] Oklahoma legislature sends abortion pill reversal law to pro-life governor’s desk
+
+- **URL**: https://www.lifesitenews.com/news/oklahoma-legislature-sends-abortion-pill-reversal-law-to-pro-life-governors-desk
 - **Carries claim**: Abortion pill reversal can help women halt medical abortions.
 - **Originated by**: Heartbeat International and other anti-abortion organizations
 - **Debunked by**: cbsnews.com
-- **Evidence quote from article**: 'Abortion Pill Reversal provides real hope for women who want to stop their abortions and continue their pregnancies.'
-- **LLM reasoning**: The article repeats the claim that abortion pill reversal can halt medical abortions as fact, citing purported success rates and pro‑life doctors without presenting any counter‑evidence.
+- **LLM reasoning**: The article presents the reversal claim as factual and endorses it, without providing counter‑evidence or a neutral stance.
 
-### [pjmedia.com] Liz Warren and Her Coven of Witches Don't Care About Women. Here's How We Know.
+### [lifesitenews.com] Abortion pill reversal explains why life-saving technique isn’t ‘junk science’
 
-- **URL**: https://pjmedia.com/columns/paula-bolyard/2022/07/07/liz-warren-the-right-refuses-to-help-pregnant-people-also-liz-warren-shut-down-all-the-crisis-pregnancy-centers-n1611137
-- **Carries claim**: Crisis pregnancy centers (CPCs) provide accurate and unbiased information about reproductive health care.
-- **Originated by**: Heartbeat International and other CPCs
+- **URL**: https://www.lifesitenews.com/news/abortion-pill-reversal-explains-why-life-saving-technique-isnt-junk-science
+- **Carries claim**: Abortion pill reversal can be used to reverse a medication abortion by taking large amounts of progesterone and not taking the misoprostol pills.
+- **Originated by**: Heartbeat International and other anti-abortion activists
 - **Debunked by**: jezebel.com
-- **LLM reasoning**: The article presents crisis pregnancy centers as offering comprehensive, free services and proper prenatal care, implying they provide accurate and unbiased information, thereby endorsing the claim.
+- **Evidence quote from article**: 'Abortion pill reversal consists of administering extra progesterone to counteract mifepristone’s effects, ideally within 24 hours of taking the abortion pill.'
+- **LLM reasoning**: The article presents the reversal technique as a valid, evidence‑based method and endorses it, effectively repeating the claim uncritically.
 
-### [foxnews.com] Experts sound the alarm over 'shocking' study showing significant risks to women who take abortion pills
+### [ncregister.com] Pro-Abortion Group’s Study Finds Ingredient in Morning-After Pill Can Induce Abortion
 
-- **URL**: https://www.foxnews.com/politics/experts-sound-alarm-over-shocking-study-showing-significant-risk-women-who-take-abortion-pills
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **LLM reasoning**: The article repeats the Ethics & Public Policy Center’s claim about a 1‑in‑10 serious adverse event rate uncritically, presenting it as fact without counter‑evidence.
+- **URL**: https://www.ncregister.com/cna/morning-after-pill-can-induce-abortion
+- **Carries claim**: Emergency contraception such as Plan B is an abortifacient and can induce abortion.
+- **Originated by**: (unknown); Brett Kavanaugh; Jacob Rees-Mogg; Judge Brett Kavanaugh; Kanye West; Pill Club's survey respondents (men in the U.S.); Priests for Life; U.S. government (via USAID); null
+- **Debunked by**: businessinsider.com, elitedaily.com, ibtimes.com, msmagazine.com, vice.com, yahoo.com
+- **LLM reasoning**: The article presents the claim that emergency contraception can act as an abortifacient, citing a study and expert statements that support this view, thereby endorsing the claim rather than refuting it.
 
-### [breitbart.com] HHS Secretary RFK Jr. Orders ‘Complete Review’ of Abortion Pill
+### [livescience.com] Is getting an IUD painful?
 
-- **URL**: https://www.breitbart.com/politics/2025/05/15/hhs-secretary-rfk-jr-orders-complete-review-of-abortion-pill-after-shocking-study/
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **LLM reasoning**: The article presents the EPPC claim as a factual finding and uses it to support a call for stricter safeguards, without refuting or questioning its validity.
+- **URL**: https://www.livescience.com/health/fertility-pregnancy-birth/is-getting-an-iud-painful
+- **Carries claim**: IUD insertion can be painful, but pain management options are available.
+- **Originated by**: Ms. Magazine
+- **Debunked by**: all.org
+- **LLM reasoning**: The article confirms that IUD insertion can be painful and lists various pain‑management methods, thereby presenting the claim as true.
+
+### [benzinga.com] Her Bodhi Reviews – Best Natural Primal Queen Alternative for Hormonal Balance Weight Loss
+
+- **URL**: https://www.benzinga.com/pressreleases/25/08/g47379946/her-bodhi-reviews-best-natural-primal-queen-alternative-for-hormonal-balance-weight-loss
+- **Carries claim**: A supplement for menopausal women is formulated with botanicals that support hormonal balance.
+- **Originated by**: Goop
+- **Debunked by**: businessinsider.com
+- **Evidence quote from article**: 'Each ingredient—whether Ashwagandha for stress relief, DIM for estrogen metabolism, or probiotics for gut balance—is carefully chosen, clinically studied, and disclosed in full.'
+- **LLM reasoning**: The article presents the claim that HerBodhi is formulated with botanicals that support hormonal balance as a factual statement, without citing evidence or acknowledging any debunking, thereby endorsing the claim.
+
+### [lifenews.com] She Reversed the Abortion Pill and Saved Her Baby's Life
+
+- **URL**: https://www.lifenews.com/2026/04/03/she-reversed-the-abortion-pill-and-saved-her-babys-life/
+- **Carries claim**: Abortion pill reversal can be used to reverse a medication abortion by taking large amounts of progesterone and not taking the misoprostol pills.
+- **Originated by**: Heartbeat International and other anti-abortion activists
+- **Debunked by**: jezebel.com
+- **Evidence quote from article**: 'Abortion pill reversal is simply a dose of progesterone, which counteracts mifepristone and protects the uterine lining.'
+- **LLM reasoning**: The article repeats the claim uncritically, presenting it as a proven method and endorsing it through a personal success story.
 
 ### [foxnews.com] I chose abortion, then changed my mind — California wants that choice gone
 
@@ -155,84 +234,40 @@ Full bake-off and gold-set methodology in `docs/BACKLOG.md` ('Stage 4b precision
 - **Carries claim**: Abortion pill reversal can help women halt medical abortions.
 - **Originated by**: Heartbeat International and other anti-abortion organizations
 - **Debunked by**: cbsnews.com
-- **LLM reasoning**: The article presents the reversal claim as fact and endorses it without providing any counter‑evidence or critique.
+- **LLM reasoning**: The article presents the reversal claim as true and endorses it without providing any counter‑evidence or critique.
 
-### [dailysignal.com] EXCLUSIVE: Lawmaker Aims to Give Babies Faced With Being Aborted a ‘Second Chance at Life’
+### [blackchronicle.com] Doctor: NC pregnancy centers a ‘go-to’ for women in crisis this Christmas season
 
-- **URL**: https://www.dailysignal.com/2025/09/17/exclusive-lawmaker-aims-to-give-babies-faced-with-being-aborted-second-chance-life/
+- **URL**: https://blackchronicle.com/southeast/north-carolina/doctor-nc-pregnancy-centers-a-go-to-for-women-in-crisis-this-christmas-season/
+- **Carries claim**: Crisis pregnancy centers (CPCs) provide accurate and unbiased information about reproductive health care.
+- **Originated by**: Heartbeat International and other CPCs
+- **Debunked by**: jezebel.com
+- **Evidence quote from article**: 'Bane said that “women who face an unexpected pregnancy are in a true crisis, and pregnancy centers empower them with information and provide excellent healthcare as they consider their options.”'
+- **LLM reasoning**: The article presents the pregnancy centers as a trusted source of information and care, endorsing their role without any critique or mention of bias.
+
+### [lifesitenews.com] Federal judge rules Colorado can’t force Catholic pregnancy center to stop abortion pill reversal
+
+- **URL**: https://www.lifesitenews.com/news/federal-judge-rules-colorado-cant-force-catholic-pregnancy-center-to-stop-abortion-pill-reversal/
 - **Carries claim**: Abortion pill reversal can help women halt medical abortions.
 - **Originated by**: Heartbeat International and other anti-abortion organizations
 - **Debunked by**: cbsnews.com
-- **Evidence quote from article**: 'If a woman takes mifepristone and then decides she does not want to continue with the abortion, a treatment exists to reverse the effects of the abortion pill. Abortion pill reversal uses progesterone to reverse the effects of mifepristone to save the life of the unborn child.'
-- **LLM reasoning**: The article repeats the claim that abortion pill reversal can halt a medical abortion and presents it as a factual, viable option without any counter‑evidence or skepticism.
-
-### [theconversation.com] Women in Ghana can access safe abortions: why are so many still using unsafe methods?
-
-- **URL**: https://theconversation.com/women-in-ghana-can-access-safe-abortions-why-are-so-many-still-using-unsafe-methods-274991
-- **Carries claim**: Mifepristone abortion is safe and effective.
-- **Originated by**: Danco Laboratories
-- **Debunked by**: patriotpost.us
-- **Evidence quote from article**: 'When used correctly and with proper guidance it is an acceptable, effective and safe method.'
-- **LLM reasoning**: The article presents the claim that mifepristone abortion is safe and effective as a factual statement, endorsing it while also noting conditions for safety.
-
-### [thenation.com] The Supreme Court Sides With the FDA on the Abortion Pill—for Now
-
-- **URL**: https://www.thenation.com/article/society/supreme-court-fda-mifepristone-abortion/
-- **Carries claim**: The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra.'
-- **Originated by**: Planned Parenthood
-- **Debunked by**: breitbart.com
-- **Evidence quote from article**: 'In reality, the drug was safe and would eventually be considered safer than penicillin and Viagra.'
-- **LLM reasoning**: The article presents the claim that mifepristone is safer than penicillin and Viagra as a factual statement, endorsing it without refutation.
-
-### [motherjones.com] On its 25th birthday, mifepristone is more under attack than ever
-
-- **URL**: https://www.motherjones.com/politics/2025/09/on-its-25th-birthday-mifepristone-abortion-pill-is-more-under-attack-than-ever/
-- **Carries claim**: The abortion drug mifepristone is 'safer than many other medicines like penicillin, Tylenol, and Viagra.'
-- **Originated by**: Planned Parenthood
-- **Debunked by**: breitbart.com
-- **Evidence quote from article**: 'As Carrie N. Baker, a Smith College professor and author of Abortion Pills: US History and Politics, told my colleague Nina Martin earlier this year, medication abortion “really is safer than Tylenol.”'
-- **LLM reasoning**: The article repeats the claim that mifepristone is safer than Tylenol (and by extension other medicines) without providing a counter‑argument, thereby presenting it uncritically as a fact.
-
-### [dailysignal.com] Report: Adverse Events Skyrocketed After Biden Loosened Abortion Guardrails
-
-- **URL**: https://www.dailysignal.com/2026/03/10/women-deserve-better-adverse-events-skyrocketed-biden-removed-doctors-visit-requirement-on-abortion-pill-new-report-shows/
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **Evidence quote from article**: 'The rate of serious adverse events was 10.15% when a requirement was in effect that women visit health clinics in person to obtain the pill. However, it jumped to 11.50% when that requirement was removed, according to the new report from the Ethics and Public Policy Center.'
-- **LLM reasoning**: The article presents the EAPC’s claim about adverse events as fact without providing counter‑evidence or a balanced perspective.
-
-### [latimes.com] Column: The abortion pill is safe. Is your uterus?
-
-- **URL**: https://www.latimes.com/politics/story/2024-06-13/chabria-column-supreme-court-mifepristone-abortion-pill-ruling
-- **Carries claim**: Mifepristone abortion is safe and effective.
-- **Originated by**: Danco Laboratories
-- **Debunked by**: patriotpost.us
-- **LLM reasoning**: The column explicitly states and endorses the claim that mifepristone is safe, presenting it as fact without any counter‑evidence.
-
-### [ncregister.com] Government Will Conduct Abortion Pill Review Amid Studies Showing Possible Dangers
-
-- **URL**: https://www.ncregister.com/cna/government-will-conduct-abortion-pill-review-amid-studies-showing-possible-dangers
-- **Carries claim**: The Ethics and Public Policy Center report claims the pill harms women, causing 1 in 10 patients to experience what they call a 'serious adverse event,' including hemorrhage, ER visits, ectopic pregnancy and an undefined category of 'abortion-specific complications.'
-- **Originated by**: Ethics and Public Policy Center
-- **Debunked by**: cbsnews.com
-- **Evidence quote from article**: 'The first-of-its-kind study, published by the Ethics and Public Policy Center on April 28, delved into public health insurance records, finding that about 11% of women suffer at least one “serious adverse event” within 45 days of taking mifepristone for an abortion.'
-- **LLM reasoning**: The article repeats the Ethics and Public Policy Center’s findings uncritically, using them to support the narrative that the abortion pill is dangerous, without providing any counter‑evidence or debunking.
+- **Evidence quote from article**: '"Abortion pill reversal is a safe and often effective treatment for women who change their minds about chemical abortion and can reverse the effects of the first chemical abortion drug, saving the life of the unborn child,"'
+- **LLM reasoning**: The article presents the claim as true and endorses it with pro‑life sources, without offering any counter‑evidence or refutation.
 
 ## Output files for review
 
-- `data/misinfo_carriers.csv` — every (article, claim) carrier verdict, one row per pair (90 rows)
-- `data/misinfo_carriers_by_article.csv` — one row per unique flagged article (67 rows), with all claims it carries collected in `claims_carried_json`
-- `data/stage4b_verdicts.json` — full LLM verdicts for all 1,763 candidate pairs
+- `data/misinfo_carriers.csv` — every (article, claim) carrier verdict, one row per pair (187 rows)
+- `data/misinfo_carriers_by_article.csv` — one row per unique flagged article (135 rows), with all claims it carries collected in `claims_carried_json`
+- `data/stage4b_verdicts.json` — full LLM verdicts for all 2,917 candidate pairs
 - `data/claims_verified.json` — the canonical claim database used for retrieval
 - `data/articles_classified.csv` — Stage 1 article-type labels for the full eligible corpus
 
 ## Honest limits
 
 - **Recall is bounded by the fact-check corpus.** We can only flag carriers of claims that some fact-checker in our corpus has already debunked. Novel misinfo not present in the fact-check set is invisible to this pipeline.
-- **Two campaigns dominate**: Heartbeat International and other anti-abortion organizations (18/90) and Ethics and Public Policy Center (17/90). The pipeline detects concentrated amplification, not diverse misinformation.
+- **Two campaigns dominate**: Heartbeat International and other anti-abortion organizations (27/187) and Ethics and Public Policy Center (EPPC) (26/187). The pipeline detects concentrated amplification, not diverse misinformation.
 - **Verifier is `gpt-oss-safeguard:latest` at temperature 0.** Evidence quotes are validated as literal substrings of the article body (whitespace + smart-quote normalized) and nulled if the LLM hallucinates. Reviewers should still spot-check the quote against the article text before publishing the outlet name — at carrier precision 0.978, ~1–2 of every 90 flagged verdicts are expected false positives.
-- **6 candidate pairs returned UNKNOWN** after Stage 4b. Inspect in `data/stage4b_verdicts.json` if needed.
+- **22 candidate pairs returned UNKNOWN** after Stage 4b. Inspect in `data/stage4b_verdicts.json` if needed.
 
 ## Reviewer workflow
 
